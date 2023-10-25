@@ -585,7 +585,7 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse)
   if (type == LUA_TSTRING) {
     unsigned long len;
     const char *str = lua_tolstring(L, i, &len);
-    return PyBytes_FromStringAndSize(str, len);
+    return PyUnicode_FromStringAndSize(str, len);
 
   } else if (type == LUA_TNUMBER) {
     return lua_isinteger(L, i)
