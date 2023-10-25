@@ -8,7 +8,7 @@
 #include "dlfcn.h"
 
 #define TK_PYTHON_MT_VAL "santoku_python_val"
-#define TK_PYTHON_MT_FUNCTION "santoku_python_function"
+#define TK_PYTHON_MT_KWARGS "santoku_python_kwargs"
 #define TK_PYTHON_MT_GENERIC "santoku_python_generic"
 
 int TK_PYTHON_REF_IDX;
@@ -33,6 +33,7 @@ typedef struct {
   int maxn;
 } tk_python_LuaTableIter;
 
+int tk_python_builtin (lua_State *);
 int tk_python_error (lua_State *);
 void tk_lua_callmod (lua_State *, int, int, const char *, const char *);
 int tk_python_ref (lua_State *, int);
@@ -450,7 +451,7 @@ void tk_python_setup (lua_State *L)
 PyObject *tk_python_peek_val (lua_State *L, int i)
 {
   if ((luaL_testudata(L, i, TK_PYTHON_MT_GENERIC) != NULL) ||
-      (luaL_testudata(L, i, TK_PYTHON_MT_FUNCTION) != NULL)) {
+      (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS) != NULL)) {
     lua_getiuservalue(L, i, 1);
     PyObject *obj = tk_python_peek_val(L, -1);
     lua_pop(L, 1);
@@ -468,7 +469,7 @@ PyObject *tk_python_peek_val (lua_State *L, int i)
 PyObject *tk_python_peek_val_safe (lua_State *L, int i)
 {
   if ((luaL_testudata(L, i, TK_PYTHON_MT_GENERIC) != NULL) ||
-      (luaL_testudata(L, i, TK_PYTHON_MT_FUNCTION) != NULL)) {
+      (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS) != NULL)) {
     lua_getiuservalue(L, i, 1);
     PyObject *obj = tk_python_peek_val(L, -1);
     lua_pop(L, 1);
@@ -491,6 +492,23 @@ void tk_python_push_val (lua_State *L, PyObject *obj)
   luaL_setmetatable(L, TK_PYTHON_MT_VAL);
 }
 
+int tk_python_kwargs (lua_State *L)
+{
+  luaL_checktype(L, -1, LUA_TTABLE); // tbl
+  lua_pushstring(L, "dict"); // tbl dict
+  tk_python_builtin(L); // tbl dict fn
+  lua_remove(L, -2); // tbl fn
+  lua_insert(L, -2); // fn tbl
+  tk_python_call(L, 1); // fn tbl d
+
+  lua_newuserdatauv(L, 0, 1); // fn tbl d ud
+  lua_insert(L, -2); // fn tbl ud d
+  lua_setiuservalue(L, -2, 1); // fn tbl ud
+  luaL_setmetatable(L, TK_PYTHON_MT_KWARGS);
+
+  return 1;
+}
+
 int tk_python_builtin (lua_State *L)
 {
   luaL_checktype(L, -1, LUA_TSTRING);
@@ -502,9 +520,9 @@ int tk_python_builtin (lua_State *L)
   PyObject *builtin = PyObject_CallMethod(builtins, "get", "s", name);
   if (!builtin) return tk_python_error(L);
 
-  tk_python_push_val(L, builtin);
-  tk_python_python_to_lua(L, -1, false);
-  lua_remove(L, -2);
+  tk_python_push_val(L, builtin); // str bi
+  tk_python_python_to_lua(L, -1, false); // str bi lua
+  lua_remove(L, -2); // str bi
   return 1;
 }
 
@@ -625,20 +643,11 @@ int tk_python_generic_index (lua_State *L)
   return 1;
 }
 
-int tk_python_function_call (lua_State *L)
+int tk_python_generic_call (lua_State *L)
 {
   tk_python_val_call(L);
   tk_python_python_to_lua(L, -1, false);
   return 1;
-}
-
-void tk_python_function_to_lua (lua_State *L, int i)
-{
-  i = lua_absindex(L, i);
-  lua_newuserdatauv(L, 0, 1);
-  lua_pushvalue(L, i);
-  lua_setiuservalue(L, -2, 1);
-  luaL_setmetatable(L, TK_PYTHON_MT_FUNCTION);
 }
 
 void tk_python_generic_to_lua (lua_State *L, int i)
@@ -681,9 +690,6 @@ void tk_python_python_to_lua (lua_State *L, int i, bool recurse)
       tk_python_error(L);
 
     lua_pushlstring(L, str, len);
-
-  } else if (PyCallable_Check(obj)) {
-    tk_python_function_to_lua(L, i);
 
   } else {
     tk_python_generic_to_lua(L, i);
@@ -797,19 +803,32 @@ int tk_python_val_lua (lua_State *L)
 
 int tk_python_call (lua_State *L, int nargs)
 {
-  PyObject *fn = tk_python_peek_val(L, - (nargs + 1));
-  PyObject *args = PyTuple_New(nargs);
-  if (!args) return tk_python_error(L);
+  int kwargsi = -1;
+  PyObject *kwargs = NULL;
 
-  // TODO: handle kwargs
   for (int i = -nargs; i < 0; i ++)
   {
+    if (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS)) {
+      kwargs = tk_python_peek_val(L, i);
+      kwargsi = i;
+      break;
+    }
+  }
+
+  PyObject *fn = tk_python_peek_val(L, - (nargs + 1));
+  PyObject *args = PyTuple_New(kwargs ? nargs - 1 : nargs);
+  if (!args) return tk_python_error(L);
+
+  for (int i = -nargs; i < 0; i ++)
+  {
+    if (kwargs && i == kwargsi)
+      continue;
     PyObject *arg = tk_python_lua_to_python(L, i, false);
     if (PyTuple_SetItem(args, i + nargs, arg))
       return tk_python_error(L);
   }
 
-  PyObject *res = PyObject_Call(fn, args, NULL);
+  PyObject *res = PyObject_Call(fn, args, kwargs);
   if (!res) return tk_python_error(L);
   Py_DECREF(args);
 
@@ -854,6 +873,7 @@ luaL_Reg tk_python_fns[] =
 {
   { "builtin", tk_python_builtin },
   { "import", tk_python_import },
+  { "kwargs", tk_python_kwargs },
   { NULL, NULL }
 };
 
@@ -871,14 +891,14 @@ int luaopen_santoku_python (lua_State *L)
   lua_setfield(L, -2, "__gc"); // mt mte
   lua_pop(L, 1); // mt
 
-  luaL_newmetatable(L, TK_PYTHON_MT_FUNCTION); // mt mte
-  lua_pushcfunction(L, tk_python_function_call);
-  lua_setfield(L, -2, "__call"); // mt mte
+  luaL_newmetatable(L, TK_PYTHON_MT_KWARGS); // mt mte
   lua_pop(L, 1); // mt
 
   luaL_newmetatable(L, TK_PYTHON_MT_GENERIC); // mt mte
   lua_pushcfunction(L, tk_python_generic_index);
   lua_setfield(L, -2, "__index"); // mt mte
+  lua_pushcfunction(L, tk_python_generic_call);
+  lua_setfield(L, -2, "__call"); // mt mte
   lua_pop(L, 1); // mt
 
   lua_newtable(L);
