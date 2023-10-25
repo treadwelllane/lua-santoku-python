@@ -452,6 +452,7 @@ void tk_python_setup (lua_State *L)
 PyObject *tk_python_peek_val (lua_State *L, int i)
 {
   if ((luaL_testudata(L, i, TK_PYTHON_MT_GENERIC) != NULL) ||
+      (luaL_testudata(L, i, TK_PYTHON_MT_TUPLE) != NULL) ||
       (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS) != NULL)) {
     lua_getiuservalue(L, i, 1);
     PyObject *obj = tk_python_peek_val(L, -1);
@@ -470,6 +471,7 @@ PyObject *tk_python_peek_val (lua_State *L, int i)
 PyObject *tk_python_peek_val_safe (lua_State *L, int i)
 {
   if ((luaL_testudata(L, i, TK_PYTHON_MT_GENERIC) != NULL) ||
+      (luaL_testudata(L, i, TK_PYTHON_MT_TUPLE) != NULL) ||
       (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS) != NULL)) {
     lua_getiuservalue(L, i, 1);
     PyObject *obj = tk_python_peek_val(L, -1);
@@ -673,6 +675,15 @@ void tk_python_generic_to_lua (lua_State *L, int i)
   luaL_setmetatable(L, TK_PYTHON_MT_GENERIC);
 }
 
+void tk_python_tuple_to_lua (lua_State *L, int i)
+{
+  i = lua_absindex(L, i);
+  lua_newuserdatauv(L, 0, 1);
+  lua_pushvalue(L, i);
+  lua_setiuservalue(L, -2, 1);
+  luaL_setmetatable(L, TK_PYTHON_MT_TUPLE);
+}
+
 void tk_python_python_to_lua (lua_State *L, int i, bool recurse)
 {
   PyObject *obj = tk_python_peek_val(L, i);
@@ -704,6 +715,9 @@ void tk_python_python_to_lua (lua_State *L, int i, bool recurse)
       tk_python_error(L);
 
     lua_pushlstring(L, str, len);
+
+  } else if (Py_IS_TYPE(obj, &PyTuple_Type)) {
+    tk_python_tuple_to_lua(L, i);
 
   } else {
     tk_python_generic_to_lua(L, i);
