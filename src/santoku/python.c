@@ -10,6 +10,7 @@
 #define TK_PYTHON_MT_VAL "santoku_python_val"
 #define TK_PYTHON_MT_KWARGS "santoku_python_kwargs"
 #define TK_PYTHON_MT_GENERIC "santoku_python_generic"
+#define TK_PYTHON_MT_TUPLE "santoku_python_tuple"
 
 int TK_PYTHON_REF_IDX;
 
@@ -499,7 +500,7 @@ int tk_python_kwargs (lua_State *L)
   tk_python_builtin(L); // tbl dict fn
   lua_remove(L, -2); // tbl fn
   lua_insert(L, -2); // fn tbl
-  assert(tk_python_call(L, 1) == 1); // fn tbl d
+  tk_python_call(L, 1); // fn tbl d
 
   lua_newuserdatauv(L, 0, 1); // fn tbl d ud
   lua_insert(L, -2); // fn tbl ud d
@@ -642,14 +643,25 @@ int tk_python_generic_index (lua_State *L)
   return 1;
 }
 
+int tk_python_tuple_index (lua_State *L)
+{
+  PyObject *tup = tk_python_peek_val(L, -2);
+  luaL_checktype(L, -1, LUA_TNUMBER);
+  lua_Number i = lua_tointeger(L, -1);
+
+  PyObject *mem = PyTuple_GetItem(tup, i);
+  if (!mem) return tk_python_error(L);
+
+  tk_python_push_val(L, mem);
+  tk_python_python_to_lua(L, -1, false);
+  return 1;
+}
+
 int tk_python_generic_call (lua_State *L)
 {
-  int rcs = tk_python_val_call(L);
-  for (int i = -rcs; i < 0; i ++) {
-    tk_python_python_to_lua(L, i, false);
-    lua_remove(L, i - 1);
-  }
-  return rcs;
+  tk_python_val_call(L);
+  tk_python_python_to_lua(L, -1, false);
+  return 1;
 }
 
 void tk_python_generic_to_lua (lua_State *L, int i)
@@ -834,30 +846,14 @@ int tk_python_call (lua_State *L, int nargs)
   if (!res) return tk_python_error(L);
   Py_DECREF(args);
 
-  if (Py_IS_TYPE(res, &PyTuple_Type)) {
-
-    int len = PyTuple_Size(res);
-
-    for (int i = 0; i < len; i ++) {
-      PyObject *it = PyTuple_GetItem(args, 0);
-      if (!it) return -1;
-      tk_python_push_val(L, it);
-    }
-
-    return len;
-
-  } else {
-
-    tk_python_push_val(L, res);
-
-    return 1;
-
-  }
+  tk_python_push_val(L, res);
+  return 1;
 }
 
 int tk_python_val_call (lua_State *L)
 {
-  return tk_python_call(L, lua_gettop(L) - 1);
+  tk_python_call(L, lua_gettop(L) - 1);
+  return 1;
 }
 
 int tk_python_mt_call (lua_State *L)
@@ -917,6 +913,11 @@ int luaopen_santoku_python (lua_State *L)
   lua_setfield(L, -2, "__index"); // mt mte
   lua_pushcfunction(L, tk_python_generic_call);
   lua_setfield(L, -2, "__call"); // mt mte
+  lua_pop(L, 1); // mt
+
+  luaL_newmetatable(L, TK_PYTHON_MT_TUPLE); // mt mte
+  lua_pushcfunction(L, tk_python_tuple_index);
+  lua_setfield(L, -2, "__index"); // mt mte
   lua_pop(L, 1); // mt
 
   lua_newtable(L);
