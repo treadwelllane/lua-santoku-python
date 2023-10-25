@@ -499,7 +499,7 @@ int tk_python_kwargs (lua_State *L)
   tk_python_builtin(L); // tbl dict fn
   lua_remove(L, -2); // tbl fn
   lua_insert(L, -2); // fn tbl
-  tk_python_call(L, 1); // fn tbl d
+  assert(tk_python_call(L, 1) == 1); // fn tbl d
 
   lua_newuserdatauv(L, 0, 1); // fn tbl d ud
   lua_insert(L, -2); // fn tbl ud d
@@ -632,10 +632,9 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse)
 int tk_python_generic_index (lua_State *L)
 {
   PyObject *obj = tk_python_peek_val(L, -2);
-  luaL_checktype(L, -1, LUA_TSTRING);
-  const char *name = lua_tostring(L, -1);
+  PyObject *attr = tk_python_lua_to_python(L, -1, false);
 
-  PyObject *mem = PyObject_GetAttrString(obj, name);
+  PyObject *mem = PyObject_GenericGetAttr(obj, attr);
   if (!mem) return tk_python_error(L);
 
   tk_python_push_val(L, mem);
@@ -645,9 +644,12 @@ int tk_python_generic_index (lua_State *L)
 
 int tk_python_generic_call (lua_State *L)
 {
-  tk_python_val_call(L);
-  tk_python_python_to_lua(L, -1, false);
-  return 1;
+  int rcs = tk_python_val_call(L);
+  for (int i = -rcs; i < 0; i ++) {
+    tk_python_python_to_lua(L, i, false);
+    lua_remove(L, i - 1);
+  }
+  return rcs;
 }
 
 void tk_python_generic_to_lua (lua_State *L, int i)
@@ -832,14 +834,30 @@ int tk_python_call (lua_State *L, int nargs)
   if (!res) return tk_python_error(L);
   Py_DECREF(args);
 
-  tk_python_push_val(L, res);
-  return 1;
+  if (Py_IS_TYPE(res, &PyTuple_Type)) {
+
+    int len = PyTuple_Size(res);
+
+    for (int i = 0; i < len; i ++) {
+      PyObject *it = PyTuple_GetItem(args, 0);
+      if (!it) return -1;
+      tk_python_push_val(L, it);
+    }
+
+    return len;
+
+  } else {
+
+    tk_python_push_val(L, res);
+
+    return 1;
+
+  }
 }
 
 int tk_python_val_call (lua_State *L)
 {
-  tk_python_call(L, lua_gettop(L) - 1);
-  return 1;
+  return tk_python_call(L, lua_gettop(L) - 1);
 }
 
 int tk_python_mt_call (lua_State *L)
