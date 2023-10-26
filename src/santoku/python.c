@@ -648,15 +648,23 @@ int tk_python_generic_index (lua_State *L)
 int tk_python_tuple_index (lua_State *L)
 {
   PyObject *tup = tk_python_peek_val(L, -2);
-  luaL_checktype(L, -1, LUA_TNUMBER);
-  lua_Number i = lua_tointeger(L, -1);
 
-  PyObject *mem = PyTuple_GetItem(tup, i);
-  if (!mem) return tk_python_error(L);
+  if (lua_type(L, -1) == LUA_TNUMBER) {
 
-  tk_python_push_val(L, mem);
-  tk_python_python_to_lua(L, -1, false);
-  return 1;
+    lua_Number i = lua_tointeger(L, -1);
+
+    PyObject *mem = PyTuple_GetItem(tup, i);
+    if (!mem) return tk_python_error(L);
+
+    tk_python_push_val(L, mem);
+    tk_python_python_to_lua(L, -1, false);
+    return 1;
+
+  } else {
+
+    return tk_python_generic_index(L);
+
+  }
 }
 
 int tk_python_generic_call (lua_State *L)
