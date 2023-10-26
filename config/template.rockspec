@@ -1,5 +1,5 @@
-package = "santoku-python"
-version = "0.0.1-1"
+package = "<% return name %>"
+version = "<% return version %>"
 rockspec_format = "3.0"
 
 source = {
@@ -14,7 +14,7 @@ description = {
 
 dependencies = {
   "lua >= 5.1",
-  "santoku >= 0.0.90-1",
+  "santoku >= 0.0.91-1",
 }
 
 test_dependencies = {
@@ -25,20 +25,25 @@ test_dependencies = {
 
 build = {
   type = "make",
-  makefile = "luarocks.mk",
   variables = {
     CC = "$(CC)",
     CFLAGS = "$(CFLAGS)",
     LIBFLAG = "$(LIBFLAG)",
     LIB_EXTENSION = "$(LIB_EXTENSION)",
+    LUA = "$(LUA)",
+    LUA_BINDIR = "$(LUA_BINDIR)",
+    LUA_INCDIR = "$(LUA_INCDIR)",
+    LUA_LIBDIR = "$(LUA_LIBDIR)",
   },
   install_variables = {
+    INST_PREFIX = "$(PREFIX)",
+    INST_BINDIR = "$(BINDIR)",
     INST_LIBDIR = "$(LIBDIR)",
-    INST_LUADIR = "$(LUADIR)"
+    INST_LUADIR = "$(LUADIR)",
+    INST_CONFDIR = "$(CONFDIR)",
   }
 }
 
 test = {
   type = "command",
-  command = "make -f luarocks.mk test",
 }

@@ -6,8 +6,8 @@ SRC_SO = $(SRC_O:.o=.$(LIB_EXTENSION))
 INST_LUA = $(addprefix $(INST_LUADIR)/, $(SRC_LUA))
 INST_SO = $(addprefix $(INST_LIBDIR)/, $(SRC_SO))
 
-LIB_CFLAGS = -Wall -I../deps/python/cpython -I../deps/python/cpython/Include
-LIB_LDFLAGS = -Wall -L../deps/python/cpython/ -lpython3.11
+LIB_CFLAGS = -Wall $(PYTHON_CFLAGS) -I$(LUA_INCDIR)
+LIB_LDFLAGS = -Wall $(PYTHON_LDFLAGS) -L$(LUA_LIBDIR) -llua
 
 # ifneq ($(SANITIZE),0)
 # LIB_CFLAGS += -fsanitize=address -fsanitize=leak
@@ -17,19 +17,19 @@ LIB_LDFLAGS = -Wall -L../deps/python/cpython/ -lpython3.11
 all: $(SRC_O) $(SRC_SO)
 
 %.o: %.c
-	$(CC) $(LIB_CFLAGS) $(CFLAGS) -c -o $@ $^
+	$(CC) $(LIB_CFLAGS) $(CFLAGS) -c -o $@ $<
 
 %.$(LIB_EXTENSION): %.o
-	$(CC) $(LIB_LDFLAGS) $(LDFLAGS)  $(LIBFLAG) -o $@ $^
+	$(CC) $(LIB_LDFLAGS) $(LDFLAGS) $(LIBFLAG) -o $@ $<
 
 install: $(INST_LUA) $(INST_SO)
 
 $(INST_LUADIR)/%.lua: ./%.lua
 	mkdir -p $(dir $@)
-	cp $^ $@
+	cp $< $@
 
 $(INST_LIBDIR)/%.$(LIB_EXTENSION): ./%.$(LIB_EXTENSION)
 	mkdir -p $(dir $@)
-	cp $^ $@
+	cp $< $@
 
 .PHONY: all install
