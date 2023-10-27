@@ -1,3 +1,14 @@
+ifndef $(VPFX)_LOCAL_PYTHON
+
+all: env.mk
+
+env.mk:
+	truncate -s0 env.mk
+	echo "PYTHON_CFLAGS = $(pkg-config --cflags python3)" >> env.mk
+	echo "PYTHON_LDFLAGS = $(pkg-config --libs python3)" >> env.mk
+
+else
+
 LIB = libpython3.11.so
 PRELOAD = LD_PRELOAD=$(CURDIR)/cpython/$(LIB)
 
@@ -16,5 +27,7 @@ env.mk:
 	truncate -s0 env.mk
 	echo "PYTHON_CFLAGS = -I$(CURDIR)/cpython -I$(CURDIR)/cpython/Include" >> env.mk
 	echo "PYTHON_LDFLAGS = -L$(CURDIR)/cpython -lpython3.11" >> env.mk
+
+endif
 
 .PHONY: all

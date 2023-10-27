@@ -2,6 +2,8 @@ local _ENV = {}
 
 name = "santoku-python"
 version = "0.0.4-1"
+variable_prefix = "TK_PYTHON"
+
 license = "MIT"
 
 dependencies = {

@@ -1,12 +1,14 @@
-ifndef $(ENV)
-ENV = default
+include .build.mk
+
+ifndef $(VPFX)_ENV
+export $(VPFX)_ENV = default
 endif
 
-export ROOT_DIR = $(PWD)
-export BUILD_DIR = $(ROOT_DIR)/.build/$(ENV)
-export TOKU_TEMPLATE = toku template -M -c config/toku-template.lua
+ROOT_DIR = $(PWD)
+BUILD_DIR = $(ROOT_DIR)/.build/$($(VPFX)_ENV)
 
-include $(BUILD_DIR)/init.mk
+TOKU_TEMPLATE = toku template -M -c config/toku-template.lua
+ROCKSPEC = $(BUILD_DIR)/$(NAME)-$(VERSION).rockspec
 
 SRC = $(shell find src -type f 2>/dev/null)
 TEST = $(shell find test -type f 2>/dev/null)
@@ -58,19 +60,18 @@ upload: all
 	@gh release create $(VERSION) $(BUILD_DIR)/$(TARBALL)
 	@luarocks upload --skip-pack --api-key "$(LUAROCKS_API_KEY)" "$(ROCKSPEC)"
 
-$(BUILD_DIR)/init.mk: config/init.mk config/toku-template.lua
+.build.mk: config/init.mk config/toku-template.lua
 	@echo "Templating '$<' -> '$@'"
-	@LUAROCKS="$(LUAROCKS)" \
-	LUA="$(shell $(LUAROCKS) config lua_interpreter)" \
+	@LUA="$(shell $(LUAROCKS) config lua_interpreter)" \
 	LUA_PATH="$(shell $(LUAROCKS) path --lr-path);?.lua" \
 	LUA_CPATH="$(shell $(LUAROCKS) path --lr-cpath)" \
 		$(TOKU_TEMPLATE) -f "$<" -o "$@"
 
-$(ROCKSPEC): config/template.rockspec $(BUILD_DIR)/init.mk
+$(ROCKSPEC): config/template.rockspec .build.mk
 	@echo "Templating '$<' -> '$@'"
 	@$(TOKU_TEMPLATE) -f "$<" -o "$@"
 
-$(LUAROCKS_MK): config/luarocks.mk $(BUILD_DIR)/init.mk
+$(LUAROCKS_MK): config/luarocks.mk .build.mk
 	@echo "Templating '$<' -> '$@'"
 	@$(TOKU_TEMPLATE) -f "$<" -o "$@"
 
@@ -87,3 +88,4 @@ $(BUILD_DIR)/%: %
 -include $(shell find $(BUILD_DIR) -path "*/deps" -prune -o -name "*.d" -print 2>/dev/null)
 
 .PHONY: all test iterate clean clean-all upload
+.DEFAULT_GOAL: all

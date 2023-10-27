@@ -24,15 +24,15 @@ test_dependencies = {
 
 build = {
   type = "make",
-  variables = {
+  build_variables = {
     CC = "$(CC)",
     CFLAGS = "$(CFLAGS)",
-    LIBFLAG = "$(LIBFLAG)",
     LIB_EXTENSION = "$(LIB_EXTENSION)",
-    LUA = "$(LUA)",
+    LIBFLAG = "$(LIBFLAG)",
     LUA_BINDIR = "$(LUA_BINDIR)",
     LUA_INCDIR = "$(LUA_INCDIR)",
     LUA_LIBDIR = "$(LUA_LIBDIR)",
+    LUA = "$(LUA)",
   },
   install_variables = {
     INST_PREFIX = "$(PREFIX)",
