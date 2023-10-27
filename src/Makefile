@@ -9,10 +9,10 @@ INST_SO = $(addprefix $(INST_LIBDIR)/, $(SRC_SO))
 LIB_CFLAGS = -Wall $(PYTHON_CFLAGS) -I$(LUA_INCDIR)
 LIB_LDFLAGS = -Wall $(PYTHON_LDFLAGS) -L$(LUA_LIBDIR) -llua
 
-# ifneq ($(SANITIZE),0)
-# LIB_CFLAGS += -fsanitize=address -fsanitize=leak
-# LIB_LDFLAGS += -fsanitize=address -fsanitize=leak
-# endif
+ifneq ($(SANITIZE),0)
+LIB_CFLAGS += -fsanitize=address -fsanitize=leak
+LIB_LDFLAGS += -fsanitize=address -fsanitize=leak
+endif
 
 all: $(SRC_O) $(SRC_SO)
 

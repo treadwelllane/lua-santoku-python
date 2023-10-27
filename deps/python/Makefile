@@ -13,7 +13,7 @@ cpython/$(LIB):
 	cd cpython && make -s -j2
 
 env.mk:
-	truncate env.mk
+	truncate -s0 env.mk
 	echo "PYTHON_CFLAGS = -I$(CURDIR)/cpython -I$(CURDIR)/cpython/Include" >> env.mk
 	echo "PYTHON_LDFLAGS = -L$(CURDIR)/cpython -lpython3.11" >> env.mk
 
