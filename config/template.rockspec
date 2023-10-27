@@ -1,26 +1,25 @@
+<% vec = require("santoku.vector") %>
+<% str = require("santoku.string") %>
+
 package = "<% return name %>"
 version = "<% return version %>"
 rockspec_format = "3.0"
 
 source = {
-  url = "git+ssh://git@github.com:treadwelllane/lua-santoku-python.git",
-  tag = version
+  url = "<% return download %>",
 }
 
 description = {
-  homepage = "https://github.com/treadwelllane/lua-santoku-python",
-  license = "MIT"
+  homepage = "<% return homepage %>",
+  license = "<% return license %>"
 }
 
 dependencies = {
-  "lua >= 5.1",
-  "santoku >= 0.0.91-1",
+  <% return vec.wrap(dependencies):map(str.quote):concat(",\n") %>
 }
 
 test_dependencies = {
-  "luafilesystem >= 1.8.0-1",
-  "luassert >= 1.9.0-1",
-  "luacov >= 0.15.0",
+  <% return vec.wrap(test_dependencies):map(str.quote):concat(",\n") %>
 }
 
 build = {
@@ -46,4 +45,5 @@ build = {
 
 test = {
   type = "command",
+  command = "make test"
 }

@@ -1,5 +1,4 @@
 LUAROCKS = luarocks --tree $(BUILD_DIR)/lua_modules
-TOKU_TEMPLATE = toku template -M -c config/toku-template.lua
 
 SRC = $(shell find src -type f 2>/dev/null)
 TEST = $(shell find test -type f 2>/dev/null)
