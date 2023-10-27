@@ -4,7 +4,7 @@ all: deps/python/env.mk lua.env
 test:
 	@rm -f luacov.stats.out || true
 	@echo
-	@source ./lua.env && $(LUA) -l luacov test/run.lua
+	@. ./lua.env && $(LUA) -l luacov test/run.lua
 	@luacheck --config test/luacheck.lua src test/spec || true
 	@luacov -c test/luacov.lua || true
 	@cat luacov.report.out | awk '/^Summary/ { P = NR } P && NR > P + 1'

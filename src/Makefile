@@ -7,7 +7,7 @@ INST_LUA = $(addprefix $(INST_LUADIR)/, $(SRC_LUA))
 INST_SO = $(addprefix $(INST_LIBDIR)/, $(SRC_SO))
 
 LIB_CFLAGS = -Wall $(PYTHON_CFLAGS) -I$(LUA_INCDIR)
-LIB_LDFLAGS = -Wall $(PYTHON_LDFLAGS) -L$(LUA_LIBDIR) -llua
+LIB_LDFLAGS = -Wall $(PYTHON_LDFLAGS) -L$(LUA_LIBDIR)
 
 ifeq ($($(VFX)_SANITIZE),1)
 LIB_CFLAGS += -fsanitize=address -fsanitize=leak

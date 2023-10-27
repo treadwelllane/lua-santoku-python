@@ -76,14 +76,15 @@ $(LUAROCKS_MK): config/luarocks.mk .build.mk
 	@$(TOKU_TEMPLATE) -f "$<" -o "$@"
 
 $(BUILD_DIR)/%: %
-	@if [ "$<" = "$${$^#res}" ]; then \
-		echo "Templating '$<' -> '$@'"; \
-		$(TOKU_TEMPLATE) -f "$<" -o "$@"; \
-	else \
-		echo "Copying '$<' -> '$@'"; \
-		mkdir -p "$(dir $@)"; \
-		cp "$<" "$@"; \
-	fi
+	@case "$<" in \
+		res/*) \
+			echo "Copying '$<' -> '$@'"; \
+			mkdir -p "$(dir $@)"; \
+			cp "$<" "$@";; \
+		*) \
+			echo "Templating '$<' -> '$@'"; \
+			$(TOKU_TEMPLATE) -f "$<" -o "$@";; \
+	esac
 
 -include $(shell find $(BUILD_DIR) -path "*/deps" -prune -o -name "*.d" -print 2>/dev/null)
 

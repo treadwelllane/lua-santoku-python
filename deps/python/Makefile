@@ -1,11 +1,11 @@
-ifndef $(VPFX)_LOCAL_PYTHON
+ifneq ($(VPFX)_LOCAL_PYTHON,1)
 
 all: env.mk
 
 env.mk:
 	truncate -s0 env.mk
-	echo "PYTHON_CFLAGS = $(pkg-config --cflags python3)" >> env.mk
-	echo "PYTHON_LDFLAGS = $(pkg-config --libs python3)" >> env.mk
+	echo "PYTHON_CFLAGS = $(shell pkg-config --cflags python3-embed)" >> env.mk
+	echo "PYTHON_LDFLAGS = $(shell pkg-config --libs python3-embed)" >> env.mk
 
 else
 
