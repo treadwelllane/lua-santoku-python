@@ -103,7 +103,7 @@ static int tk_python_LuaTableIter_init
 static int tk_python_LuaTableIter_dealloc
 ( tk_python_LuaTableIter *self )
 {
-  Py_INCREF(self->source);
+  Py_DECREF(self->source);
   return 0;
 }
 
@@ -150,7 +150,9 @@ PyObject *tk_python_LuaTableIter_next
     PyObject *val = tk_python_lua_to_python(L, -1, false);
     PyObject *ret = Py_BuildValue("(O O)", key, val);
 
-    tk_python_unref(L, self->kref);
+    if (self->kref != LUA_NOREF)
+      tk_python_unref(L, self->kref);
+
     self->kref = tk_python_ref(L, -2);
     lua_pop(L, 3);
 
@@ -201,6 +203,7 @@ PyObject *tk_python_LuaTable_iter
 PyObject *tk_python_LuaTableIter_iter
 ( tk_python_LuaTableIter *self )
 {
+  Py_DECREF(self->source);
   return (PyObject *) self;
 }
 
@@ -419,33 +422,44 @@ void tk_python_deref (lua_State *L, int ref)
 
 void tk_python_push_val (lua_State *, PyObject *);
 
-void tk_python_setup (lua_State *L)
-{
-  void *python = dlopen("libpython3.11.so", RTLD_NOW | RTLD_GLOBAL);
+void *PYTHON = NULL;
 
-  if (python == NULL)
+int tk_python_close (lua_State *L)
+{
+  dlclose(PYTHON);
+  Py_Finalize();
+  return 0;
+}
+
+int tk_python_collect (lua_State *L)
+{
+  ssize_t res = PyGC_Collect();
+  lua_pushinteger(L, res);
+  return 1;
+}
+
+int tk_python_open (lua_State *L)
+{
+  luaL_checktype(L, -1, LUA_TSTRING);
+  const char *lib = lua_tostring(L, -1);
+
+  PYTHON = dlopen(lib, RTLD_NOW | RTLD_GLOBAL);
+
+  if (PYTHON == NULL)
     luaL_error(L, "Error loading python library");
 
   Py_Initialize();
 
   if (PyType_Ready(&tk_python_LuaTableType) < 0)
-  {
-    tk_python_error(L);
-    return;
-  }
+    return tk_python_error(L);
 
   if (PyType_Ready(&tk_python_LuaTableIterType) < 0)
-  {
-    tk_python_error(L);
-    return;
-  }
+    return tk_python_error(L);
 
   if (PyType_Ready(&tk_python_LuaVectorType) < 0)
-  {
-    tk_python_error(L);
-    return;
-  }
+    return tk_python_error(L);
 
+  return 0;
 }
 
 // TODO: Combine with above
@@ -907,6 +921,9 @@ int tk_python_mt_call (lua_State *L)
 
 luaL_Reg tk_python_fns[] =
 {
+  { "open", tk_python_open },
+  { "collect", tk_python_collect },
+  { "close", tk_python_close },
   { "builtin", tk_python_builtin },
   { "import", tk_python_import },
   { "kwargs", tk_python_kwargs },
@@ -946,8 +963,6 @@ int luaopen_santoku_python (lua_State *L)
   TK_PYTHON_REF_IDX = luaL_ref(L, LUA_REGISTRYINDEX);
   lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX);
   lua_setfield(L, -2, "REF_IDX");
-
-  tk_python_setup(L);
 
   return 1;
 }

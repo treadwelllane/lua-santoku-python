@@ -1,11 +1,9 @@
-ifneq ($(VPFX)_LOCAL_PYTHON,1)
+ifneq ($($(VPFX)_LOCAL_PYTHON),1)
 
-all: env.mk
-
-env.mk:
-	truncate -s0 env.mk
-	echo "PYTHON_CFLAGS = $(shell pkg-config --cflags python3-embed)" >> env.mk
-	echo "PYTHON_LDFLAGS = $(shell pkg-config --libs python3-embed)" >> env.mk
+results.mk: Makefile
+	truncate -s0 results.mk
+	echo "LIB_CFLAGS += $(shell pkg-config --cflags python3-embed)" >> results.mk
+	echo "LIB_LDFLAGS += $(shell pkg-config --libs python3-embed)" >> results.mk
 
 else
 
@@ -15,18 +13,16 @@ PRELOAD = LD_PRELOAD=$(CURDIR)/cpython/$(LIB)
 export PYTHON = $(PRELOAD) $(CURDIR)/cpython/python
 export PIP = $(PRELOAD) $(CURDIR)/venv/bin/pip
 
-all: cpython/$(LIB) env.mk
+results.mk: Makefile cpython/$(LIB)
+	truncate -s0 results.mk
+	echo "LIB_CFLAGS += -I$(CURDIR)/cpython -I$(CURDIR)/cpython/Include" >> results.mk
+	echo "LIB_LDFLAGS += -L$(CURDIR)/cpython -lpython3.11" >> results.mk
 
 cpython/$(LIB):
 	[ ! -d cpython ] && \
 		git clone https://github.com/python/cpython --depth 1 --branch 3.11 || true
-	cd cpython && ./configure --enable-shared
+	cd cpython && ./configure --enable-shared --with-address-sanitizer --with-pydebug
 	cd cpython && make -s -j2
-
-env.mk:
-	truncate -s0 env.mk
-	echo "PYTHON_CFLAGS = -I$(CURDIR)/cpython -I$(CURDIR)/cpython/Include" >> env.mk
-	echo "PYTHON_LDFLAGS = -L$(CURDIR)/cpython -lpython3.11" >> env.mk
 
 endif
 
