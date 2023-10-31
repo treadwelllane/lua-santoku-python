@@ -40,13 +40,13 @@ void tk_lua_callmod (lua_State *, int, int, const char *, const char *);
 int tk_python_ref (lua_State *, int);
 void tk_python_unref (lua_State *, int);
 void tk_python_deref (lua_State *, int);
-static PyTypeObject tk_python_LuaTableIterType;
+PyTypeObject tk_python_LuaTableIterType;
 PyObject *tk_python_lua_to_python (lua_State *, int, bool);
 void tk_python_python_to_lua (lua_State *, int, bool);
 int tk_python_val_call (lua_State *);
 int tk_python_call (lua_State *, int);
 
-static int tk_python_LuaTable_init
+int tk_python_LuaTable_init
 ( tk_python_LuaTable *self,
   PyObject *args,
   PyObject *kwargs )
@@ -69,7 +69,7 @@ static int tk_python_LuaTable_init
   return 0;
 }
 
-static int tk_python_LuaTableIter_init
+int tk_python_LuaTableIter_init
 ( tk_python_LuaTableIter *self,
   PyObject *args,
   PyObject *kwargs )
@@ -100,7 +100,7 @@ static int tk_python_LuaTableIter_init
   return 0;
 }
 
-static int tk_python_LuaTableIter_dealloc
+int tk_python_LuaTableIter_dealloc
 ( tk_python_LuaTableIter *self )
 {
   Py_DECREF(self->source);
@@ -166,7 +166,7 @@ stop:
 
 }
 
-static int tk_python_LuaTable_dealloc
+int tk_python_LuaTable_dealloc
 ( tk_python_LuaTable *self )
 {
   lua_State *L = (lua_State *) self->Lp;
@@ -203,13 +203,12 @@ PyObject *tk_python_LuaTable_iter
 PyObject *tk_python_LuaTableIter_iter
 ( tk_python_LuaTableIter *self )
 {
-  Py_DECREF(self->source);
   return (PyObject *) self;
 }
 
-static PySequenceMethods tk_python_LuaVector_as_sequence;
+PySequenceMethods tk_python_LuaVector_as_sequence;
 
-static PyTypeObject tk_python_LuaVectorType = {
+PyTypeObject tk_python_LuaVectorType = {
   .ob_base = PyVarObject_HEAD_INIT(NULL, 0)
   .tp_name = "santoku.LuaVector",
   .tp_doc = PyDoc_STR("Lua object wrappers"),
@@ -335,7 +334,7 @@ PyObject *tk_python_LuaVector_sq_inplace_repeat (tk_python_LuaVector *a, Py_ssiz
   return obj;
 }
 
-static PySequenceMethods tk_python_LuaVector_as_sequence = {
+PySequenceMethods tk_python_LuaVector_as_sequence = {
   .sq_length = (lenfunc) tk_python_LuaVector_sq_length,
   .sq_concat = (binaryfunc) tk_python_LuaVector_sq_concat,
   .sq_repeat = (ssizeargfunc) tk_python_LuaVector_sq_repeat,
@@ -346,7 +345,7 @@ static PySequenceMethods tk_python_LuaVector_as_sequence = {
   .sq_inplace_concat = (binaryfunc) tk_python_LuaVector_sq_inplace_concat,
 };
 
-static PyTypeObject tk_python_LuaTableType = {
+PyTypeObject tk_python_LuaTableType = {
   .ob_base = PyVarObject_HEAD_INIT(NULL, 0)
   .tp_name = "santoku.LuaTable",
   .tp_doc = PyDoc_STR("Lua object wrappers"),
@@ -359,7 +358,7 @@ static PyTypeObject tk_python_LuaTableType = {
   .tp_iter = (getiterfunc) tk_python_LuaTable_iter,
 };
 
-static PyTypeObject tk_python_LuaTableIterType = {
+PyTypeObject tk_python_LuaTableIterType = {
   .ob_base = PyVarObject_HEAD_INIT(NULL, 0)
   .tp_name = "santoku.LuaTableIter",
   .tp_doc = PyDoc_STR("Lua object wrappers iterator"),
@@ -880,7 +879,6 @@ int tk_python_call (lua_State *L, int nargs)
 
   PyObject *res = PyObject_Call(fn, args, kwargs);
   if (!res) return tk_python_error(L);
-  Py_DECREF(args);
 
   tk_python_push_val(L, res);
   return 1;
