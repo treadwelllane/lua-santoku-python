@@ -8,7 +8,7 @@ public = true
 
 dependencies = {
   "lua >= 5.1",
-  "santoku >= 0.0.102-1",
+  "santoku >= 0.0.104-1",
 }
 
 test_dependencies = {
