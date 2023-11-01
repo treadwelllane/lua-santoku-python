@@ -873,18 +873,14 @@ int tk_python_call (lua_State *L, int nargs)
     if (kwargs && i == kwargsi)
       continue;
     PyObject *arg = tk_python_lua_to_python(L, i, false);
-    // TODO: Test this. I believe INCREF should be called since the tuple will
-    // "steal" ownership. This is why we had to comment out the DECREF on the
-    // tuple below.
-    // Py_INCREF(arg);
+    Py_INCREF(arg);
     if (PyTuple_SetItem(args, i + nargs, arg))
       return tk_python_error(L);
   }
 
   PyObject *res = PyObject_Call(fn, args, kwargs);
   if (!res) return tk_python_error(L);
-  // TODO: See above
-  // Py_DECREF(args);
+  Py_DECREF(args);
 
   tk_python_push_val(L, res);
   return 1;
