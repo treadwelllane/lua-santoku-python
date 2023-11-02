@@ -1,14 +1,14 @@
 local _ENV = {}
 
 name = "santoku-python"
-version = "0.0.13-1"
+version = "0.0.14-1"
 variable_prefix = "TK_PYTHON"
 license = "MIT"
 public = true
 
 dependencies = {
   "lua >= 5.1",
-  "santoku >= 0.0.106-1",
+  "santoku >= 0.0.107-1",
 }
 
 test_dependencies = {
