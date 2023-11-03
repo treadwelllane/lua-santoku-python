@@ -397,9 +397,9 @@ int tk_python_error (lua_State *L)
 
 int tk_python_ref (lua_State *L, int i)
 {
-  i = lua_absindex(L, i);
-  lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX); // idx
-  lua_pushvalue(L, i); // idx tbl
+  lua_pushvalue(L, i); // val
+  lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX); // tbl idx
+  lua_insert(L, -2); // idx tbl
   int ref = luaL_ref(L, -2); // idx
   lua_pop(L, 1); //
   return ref;
@@ -467,13 +467,13 @@ PyObject *tk_python_peek_val (lua_State *L, int i)
   if ((luaL_testudata(L, i, TK_PYTHON_MT_GENERIC) != NULL) ||
       (luaL_testudata(L, i, TK_PYTHON_MT_TUPLE) != NULL) ||
       (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS) != NULL)) {
-    lua_getiuservalue(L, i, 1);
+    lua_getuservalue(L, i);
     PyObject *obj = tk_python_peek_val(L, -1);
     lua_pop(L, 1);
     return obj;
   } else {
     luaL_checkudata(L, i, TK_PYTHON_MT_VAL);
-    lua_getiuservalue(L, i, 1);
+    lua_getuservalue(L, i);
     PyObject *obj = (PyObject *) lua_touserdata(L, -1);
     lua_pop(L, 1);
     return obj;
@@ -486,12 +486,12 @@ PyObject *tk_python_peek_val_safe (lua_State *L, int i)
   if ((luaL_testudata(L, i, TK_PYTHON_MT_GENERIC) != NULL) ||
       (luaL_testudata(L, i, TK_PYTHON_MT_TUPLE) != NULL) ||
       (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS) != NULL)) {
-    lua_getiuservalue(L, i, 1);
+    lua_getuservalue(L, i);
     PyObject *obj = tk_python_peek_val(L, -1);
     lua_pop(L, 1);
     return obj;
   } else if (luaL_testudata(L, i, TK_PYTHON_MT_VAL) != NULL) {
-    lua_getiuservalue(L, i, 1);
+    lua_getuservalue(L, i);
     PyObject *obj = (PyObject *) lua_touserdata(L, -1);
     lua_pop(L, 1);
     return obj;
@@ -502,9 +502,9 @@ PyObject *tk_python_peek_val_safe (lua_State *L, int i)
 
 void tk_python_push_val (lua_State *L, PyObject *obj)
 {
-  lua_newuserdatauv(L, 0, 1);
+  lua_newuserdata(L, 0);
   lua_pushlightuserdata(L, obj);
-  lua_setiuservalue(L, -2, 1);
+  lua_setuservalue(L, -2);
   luaL_setmetatable(L, TK_PYTHON_MT_VAL);
 }
 
@@ -517,9 +517,9 @@ int tk_python_kwargs (lua_State *L)
   lua_insert(L, -2); // fn tbl
   tk_python_call(L, 1); // fn tbl d
 
-  lua_newuserdatauv(L, 0, 1); // fn tbl d ud
+  lua_newuserdata(L, 0); // fn tbl d ud
   lua_insert(L, -2); // fn tbl ud d
-  lua_setiuservalue(L, -2, 1); // fn tbl ud
+  lua_setuservalue(L, -2); // fn tbl ud
   luaL_setmetatable(L, TK_PYTHON_MT_KWARGS);
 
   return 1;
@@ -564,8 +564,6 @@ int tk_python_val_gc (lua_State *L)
 
 PyObject *tk_python_table_to_python (lua_State *L, int i, bool recurse)
 {
-  i = lua_absindex(L, i);
-
   int ref = tk_python_ref(L, i);
 
   if (!recurse) {
@@ -622,9 +620,10 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse)
     return PyUnicode_FromStringAndSize(str, len);
 
   } else if (type == LUA_TNUMBER) {
-    return lua_isinteger(L, i)
-      ? PyLong_FromLongLong(lua_tointeger(L, i))
-      : PyFloat_FromDouble(lua_tonumber(L, i));
+    lua_Number n = lua_tonumber(L, i);
+    return fmod(n, 1) == 0
+      ? PyLong_FromLongLong((lua_Integer) n)
+      : PyFloat_FromDouble(n);
 
   } else if (type == LUA_TBOOLEAN) {
     return lua_toboolean(L, i) ? Py_True : Py_False;
@@ -689,19 +688,19 @@ int tk_python_generic_call (lua_State *L)
 
 void tk_python_generic_to_lua (lua_State *L, int i)
 {
-  i = lua_absindex(L, i);
-  lua_newuserdatauv(L, 0, 1);
-  lua_pushvalue(L, i);
-  lua_setiuservalue(L, -2, 1);
+  lua_pushvalue(L, i); // val
+  lua_newuserdata(L, 0); // val udata
+  lua_insert(L, -2); // udata val
+  lua_setuservalue(L, -2); // udata
   luaL_setmetatable(L, TK_PYTHON_MT_GENERIC);
 }
 
 void tk_python_tuple_to_lua (lua_State *L, int i)
 {
-  i = lua_absindex(L, i);
-  lua_newuserdatauv(L, 0, 1);
-  lua_pushvalue(L, i);
-  lua_setiuservalue(L, -2, 1);
+  lua_pushvalue(L, i); // val
+  lua_newuserdata(L, 0); // val udata
+  lua_insert(L, -2); // udata val
+  lua_setuservalue(L, -2); // udata
   luaL_setmetatable(L, TK_PYTHON_MT_TUPLE);
 }
 
