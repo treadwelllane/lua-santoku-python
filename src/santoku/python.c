@@ -440,16 +440,32 @@ int tk_python_collect (lua_State *L)
   return 1;
 }
 
+char *tk_python_opened_lib_name = NULL;
+
 int tk_python_open (lua_State *L)
 {
   luaL_checktype(L, -1, LUA_TSTRING);
   const char *lib = lua_tostring(L, -1);
+
+  if (tk_python_opened_lib_name != NULL) {
+    if (!strcmp(tk_python_opened_lib_name, lib)) {
+      lua_pushboolean(L, 0);
+      lua_pushstring(L, "already open");
+      lua_pushstring(L, tk_python_opened_lib_name);
+      return 3;
+    } else {
+      lua_pushboolean(L, 1);
+      lua_pushstring(L, "already open");
+      return 2;
+    }
+  }
 
   PYTHON = dlopen(lib, RTLD_NOW | RTLD_GLOBAL);
 
   if (PYTHON == NULL)
     luaL_error(L, "Error loading python library");
 
+  tk_python_opened_lib_name = (char *) lib;
   Py_Initialize();
 
   if (PyType_Ready(&tk_python_LuaTableType) < 0)
@@ -461,7 +477,8 @@ int tk_python_open (lua_State *L)
   if (PyType_Ready(&tk_python_LuaVectorType) < 0)
     return tk_python_error(L);
 
-  return 0;
+  lua_pushboolean(L, 1);
+  return 1;
 }
 
 // TODO: Combine with above
