@@ -440,32 +440,43 @@ int tk_python_collect (lua_State *L)
   return 1;
 }
 
-char *tk_python_opened_lib_name = NULL;
+int tk_python_opened_lib_name_ref = LUA_NOREF;
 
 int tk_python_open (lua_State *L)
 {
   luaL_checktype(L, -1, LUA_TSTRING);
   const char *lib = lua_tostring(L, -1);
 
-  if (tk_python_opened_lib_name != NULL) {
-    if (!strcmp(tk_python_opened_lib_name, lib)) {
-      lua_pushboolean(L, 0);
-      lua_pushstring(L, "already open");
-      lua_pushstring(L, tk_python_opened_lib_name);
-      return 3;
+  if (tk_python_opened_lib_name_ref != LUA_NOREF) {
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, tk_python_opened_lib_name_ref); // lib oldlib
+    int same = lua_compare(L, -1, -2, LUA_OPEQ);
+
+    lua_pushstring(L, "embedded python already open: "); // lib oldlib msg
+    lua_insert(L, -2); // lib msg oldlib
+    lua_concat(L, 2); // lib msg
+    lua_remove(L, -2); // msg
+
+    if (!same) {
+      fprintf(stderr, "1\n");
+      lua_error(L);
+      return 0;
     } else {
-      lua_pushboolean(L, 1);
-      lua_pushstring(L, "already open");
+      fprintf(stderr, "2\n");
+      lua_pushboolean(L, 1); // msg bool
+      lua_insert(L, -2); // bool msg
       return 2;
     }
+
   }
+
+  tk_python_opened_lib_name_ref = luaL_ref(L, LUA_REGISTRYINDEX); //
 
   PYTHON = dlopen(lib, RTLD_NOW | RTLD_GLOBAL);
 
   if (PYTHON == NULL)
     luaL_error(L, "Error loading python library");
 
-  tk_python_opened_lib_name = (char *) lib;
   Py_Initialize();
 
   if (PyType_Ready(&tk_python_LuaTableType) < 0)
@@ -477,6 +488,7 @@ int tk_python_open (lua_State *L)
   if (PyType_Ready(&tk_python_LuaVectorType) < 0)
     return tk_python_error(L);
 
+  fprintf(stderr, "3\n");
   lua_pushboolean(L, 1);
   return 1;
 }

@@ -3,9 +3,21 @@ local test = require("santoku.test")
 local vec = require("santoku.vector")
 local py = require("santoku.python")
 
-py.open("libpython3.11.so")
-
 test("python", function ()
+
+  test("open", function ()
+
+    local ok, msg
+
+    ok, msg = py.open("libpython3.11.so")
+    assert.equals(true, ok)
+    assert.is_nil(msg)
+
+    ok, msg = py.open("libpython3.11.so")
+    assert.equals(true, ok)
+    assert.equals(msg, "embedded python already open: libpython3.11.so")
+
+  end)
 
   test("wrap", function ()
     py({ 1, 2 })
