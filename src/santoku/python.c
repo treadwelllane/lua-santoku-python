@@ -392,12 +392,39 @@ void tk_lua_callmod (lua_State *L, int nargs, int nret, const char *smod, const 
 
 int tk_python_error (lua_State *L)
 {
-  PyObject *ptype, *pvalue, *ptrace;
-  PyErr_Fetch(&ptype, &pvalue, &ptrace);
+  PyObject *ptype, *pvalue, *traceback;
+  PyErr_Fetch(&ptype, &pvalue, &traceback);
+
+  int n = 1;
   lua_pushstring(L,  PyUnicode_AsUTF8(PyObject_Str(pvalue)));
-  lua_pushstring(L,  ": ");
-  lua_pushstring(L,  PyUnicode_AsUTF8(PyObject_Str(ptrace)));
+
+  PyTracebackObject* traceRoot = (PyTracebackObject*)traceback;
+  PyTracebackObject* pTrace = traceRoot;
+
+  while (pTrace != NULL)
+  {
+    PyFrameObject* frame = pTrace->tb_frame;
+    PyCodeObject* code = PyFrame_GetCode(frame);
+
+    int lineNr = PyFrame_GetLineNumber(frame);
+    const char *sCodeName = PyUnicode_AsUTF8(code->co_name);
+    const char *sFileName = PyUnicode_AsUTF8(code->co_filename);
+
+    lua_pushstring(L, "\n  at %s (%s:%d);");
+    lua_pushstring(L, sCodeName);
+    lua_pushstring(L, sFileName);
+    lua_pushinteger(L, lineNr);
+    lua_getfield(L, -4, "format");
+    lua_insert(L, -5);
+    lua_call(L, 4, 1);
+    n ++;
+    pTrace = pTrace->tb_next;
+    Py_DECREF(code);
+  }
+
+  lua_concat(L, n);
   lua_error(L);
+
   return 0;
 }
 

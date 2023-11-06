@@ -99,6 +99,13 @@ test("python", function ()
 
   end)
 
+  test("error", function ()
+    local np = py.import("numpy")
+    assert.equals(false, pcall(function ()
+      np.array({}, {})
+    end))
+  end)
+
 end)
 
 py.collect()
