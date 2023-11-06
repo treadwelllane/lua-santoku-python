@@ -44,8 +44,8 @@ void tk_python_deref (lua_State *, int);
 void tk_python_set_ephemeron (lua_State *, int);
 void tk_python_get_ephemeron (lua_State *, int);
 PyTypeObject tk_python_LuaTableIterType;
-PyObject *tk_python_lua_to_python (lua_State *, int, bool);
-void tk_python_python_to_lua (lua_State *, int, bool);
+PyObject *tk_python_lua_to_python (lua_State *, int, bool, bool);
+void tk_python_python_to_lua (lua_State *, int, bool, bool);
 int tk_python_val_call (lua_State *);
 int tk_python_call (lua_State *, int);
 
@@ -132,7 +132,7 @@ PyObject *tk_python_LuaTableIter_next
     lua_pushinteger(L, self->kref); // tbl k
     lua_gettable(L, -2); // tbl v
 
-    PyObject *val = tk_python_lua_to_python(L, -1, false);
+    PyObject *val = tk_python_lua_to_python(L, -1, false, false);
     lua_pop(L, 2);
 
     return val;
@@ -149,8 +149,8 @@ PyObject *tk_python_LuaTableIter_next
       goto stop;
     }
 
-    PyObject *key = tk_python_lua_to_python(L, -2, false);
-    PyObject *val = tk_python_lua_to_python(L, -1, false);
+    PyObject *key = tk_python_lua_to_python(L, -2, false, false);
+    PyObject *val = tk_python_lua_to_python(L, -1, false, false);
     PyObject *ret = Py_BuildValue("(O O)", key, val);
 
     if (self->kref != LUA_NOREF)
@@ -243,7 +243,7 @@ PyObject *tk_python_LuaVector_sq_concat (tk_python_LuaVector *a, tk_python_LuaVe
   tk_python_deref(L, b->ref);
   tk_lua_callmod(L, 3, 1, "santoku.vector", "extend");
 
-  PyObject *obj = tk_python_lua_to_python(L, -1, false);
+  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
   if (!obj) { tk_python_error(L); return NULL; };
   return obj;
 }
@@ -257,7 +257,7 @@ PyObject *tk_python_LuaVector_sq_repeat (tk_python_LuaVector *a, Py_ssize_t n)
   lua_pushinteger(L, n); // v n
   tk_lua_callmod(L, 2, 1, "santoku.vector", "replicate"); // v
 
-  PyObject *obj = tk_python_lua_to_python(L, -1, false);
+  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
   if (!obj) { tk_python_error(L); return NULL; };
 
   return obj;
@@ -270,7 +270,7 @@ PyObject *tk_python_LuaVector_sq_item (tk_python_LuaVector *a, Py_ssize_t n)
   lua_pushinteger(L, n + 1); // v n
   tk_lua_callmod(L, 2, 1, "santoku.vector", "get"); // v
 
-  PyObject *obj = tk_python_lua_to_python(L, -1, false);
+  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
   if (!obj) { tk_python_error(L); return NULL; };
 
   return obj;
@@ -294,7 +294,7 @@ PyObject *tk_python_LuaVector_sq_ass_item (tk_python_LuaVector *a, Py_ssize_t n,
 
   }
 
-  PyObject *obj = tk_python_lua_to_python(L, -1, false);
+  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
   if (!obj) { tk_python_error(L); return NULL; };
 
   return obj;
@@ -308,7 +308,7 @@ PyObject *tk_python_LuaVector_sq_contains (tk_python_LuaVector *a, tk_python_Lua
 
   tk_lua_callmod(L, 2, 1, "santoku.vector", "includes"); // v
 
-  PyObject *obj = tk_python_lua_to_python(L, -1, false);
+  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
   if (!obj) { tk_python_error(L); return NULL; };
   return obj;
 }
@@ -320,7 +320,7 @@ PyObject *tk_python_LuaVector_sq_inplace_concat (tk_python_LuaVector *a, tk_pyth
   tk_python_deref(L, b->ref);
   tk_lua_callmod(L, 2, 1, "santoku.vector", "extend");
 
-  PyObject *obj = tk_python_lua_to_python(L, -1, false);
+  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
   if (!obj) { tk_python_error(L); return NULL; };
   return obj;
 }
@@ -332,7 +332,7 @@ PyObject *tk_python_LuaVector_sq_inplace_repeat (tk_python_LuaVector *a, Py_ssiz
   lua_pushinteger(L, n); // v n
   tk_lua_callmod(L, 2, 1, "santoku.vector", "replicate"); // v
 
-  PyObject *obj = tk_python_lua_to_python(L, -1, false);
+  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
   if (!obj) { tk_python_error(L); return NULL; };
   return obj;
 }
@@ -583,6 +583,18 @@ int tk_python_kwargs (lua_State *L)
   return 1;
 }
 
+int tk_python_bytes (lua_State *L)
+{
+  luaL_checktype(L, -1, LUA_TSTRING);
+  unsigned long len;
+  const char *str = lua_tolstring(L, -1, &len);
+
+  PyObject *bytes = PyBytes_FromStringAndSize(str, len);
+  tk_python_push_val(L, bytes); // str bi
+  tk_python_python_to_lua(L, -1, false, true);
+  return 1;
+}
+
 int tk_python_builtin (lua_State *L)
 {
   luaL_checktype(L, -1, LUA_TSTRING);
@@ -595,7 +607,7 @@ int tk_python_builtin (lua_State *L)
   if (!builtin) return tk_python_error(L);
 
   tk_python_push_val(L, builtin); // str bi
-  tk_python_python_to_lua(L, -1, false); // str bi lua
+  tk_python_python_to_lua(L, -1, false, false); // str bi lua
   lua_remove(L, -2); // str bi
   return 1;
 }
@@ -609,7 +621,7 @@ int tk_python_import (lua_State *L)
   if (!lib) return tk_python_error(L);
 
   tk_python_push_val(L, lib);
-  tk_python_python_to_lua(L, -1, false);
+  tk_python_python_to_lua(L, -1, false, false);
   return 1;
 }
 
@@ -665,10 +677,12 @@ PyObject *tk_python_function_to_python (lua_State *L, int i)
   return NULL;
 }
 
-PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse)
+PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse, bool force_wrap)
 {
-  PyObject *obj = tk_python_peek_val_safe(L, i);
-  if (obj) return obj;
+  if (!force_wrap) {
+    PyObject *obj = tk_python_peek_val_safe(L, i);
+    if (obj) return obj;
+  }
 
   int type = lua_type(L, i);
 
@@ -705,13 +719,13 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse)
 int tk_python_generic_index (lua_State *L)
 {
   PyObject *obj = tk_python_peek_val(L, -2);
-  PyObject *attr = tk_python_lua_to_python(L, -1, false);
+  PyObject *attr = tk_python_lua_to_python(L, -1, false, false);
 
   PyObject *mem = PyObject_GenericGetAttr(obj, attr);
   if (!mem) return tk_python_error(L);
 
   tk_python_push_val(L, mem);
-  tk_python_python_to_lua(L, -1, false);
+  tk_python_python_to_lua(L, -1, false, false);
   return 1;
 }
 
@@ -727,7 +741,7 @@ int tk_python_tuple_index (lua_State *L)
     if (!mem) return tk_python_error(L);
 
     tk_python_push_val(L, mem);
-    tk_python_python_to_lua(L, -1, false);
+    tk_python_python_to_lua(L, -1, false, false);
     return 1;
 
   } else {
@@ -740,7 +754,7 @@ int tk_python_tuple_index (lua_State *L)
 int tk_python_generic_call (lua_State *L)
 {
   tk_python_val_call(L);
-  tk_python_python_to_lua(L, -1, false);
+  tk_python_python_to_lua(L, -1, false, false);
   return 1;
 }
 
@@ -762,9 +776,12 @@ void tk_python_tuple_to_lua (lua_State *L, int i)
   luaL_setmetatable(L, TK_PYTHON_MT_TUPLE);
 }
 
-void tk_python_python_to_lua (lua_State *L, int i, bool recurse)
+void tk_python_python_to_lua (lua_State *L, int i, bool recurse, bool force_generic)
 {
   PyObject *obj = tk_python_peek_val(L, i);
+
+  if (force_generic)
+    goto generic;
 
   if (Py_IS_TYPE(obj, &PyBool_Type)) {
     lua_pushboolean(L, obj == Py_True ? 1 : 0);
@@ -785,13 +802,111 @@ void tk_python_python_to_lua (lua_State *L, int i, bool recurse)
 
     lua_pushlstring(L, str, len);
 
+  } else if (Py_IS_TYPE(obj, &PyBytes_Type)) {
+
+    ssize_t len;
+    char *str;
+    if (PyBytes_AsStringAndSize(obj, &str, &len) == -1)
+      tk_python_error(L);
+
+    lua_pushlstring(L, str, len);
+
   } else if (Py_IS_TYPE(obj, &PyTuple_Type)) {
     tk_python_tuple_to_lua(L, i);
 
   } else {
-    tk_python_generic_to_lua(L, i);
+    goto generic;
   }
 
+  return;
+
+generic:
+  tk_python_generic_to_lua(L, i);
+  return;
+
+  // PyBool_Type
+  // PyFloat_Type
+  // PyLong_Type
+  // PyDict_Type
+  // PyList_Type
+  // PyTuple_Type
+  //
+  // PyUnicode_Type
+  // PyBytes_Type
+  //
+  // PyFunction_Type
+  // PyCFunction_Type
+  // PyCMethod_Type
+  // PyClassMethod_Type
+  // PyInstanceMethod_Type
+  //
+  // PyMap_Type
+  // PySet_Type
+  //
+  // PyAsyncGen_Type
+  // PyBaseObject_Type
+  // PyByteArrayIter_Type
+  // PyByteArray_Type
+  // PyBytesIter_Type
+  // PyCallIter_Type
+  // PyCapsule_Type
+  // PyCell_Type
+  // PyClassMethodDescr_Type
+  // PyCode_Type
+  // PyComplex_Type
+  // PyContextToken_Type
+  // PyContextVar_Type
+  // PyContext_Type
+  // PyCoro_Type
+  // PyDictItems_Type
+  // PyDictIterItem_Type
+  // PyDictIterKey_Type
+  // PyDictIterValue_Type
+  // PyDictKeys_Type
+  // PyDictProxy_Type
+  // PyDictRevIterItem_Type
+  // PyDictRevIterKey_Type
+  // PyDictRevIterValue_Type
+  // PyDictValues_Type
+  // PyEllipsis_Type
+  // PyEnum_Type
+  // PyFilter_Type
+  // PyFrame_Type
+  // PyFrozenSet_Type
+  // PyGen_Type
+  // PyGetSetDescr_Type
+  // PyListIter_Type
+  // PyListRevIter_Type
+  // PyLongRangeIter_Type
+  // PyMemberDescr_Type
+  // PyMemoryView_Type
+  // PyMethodDescr_Type
+  // PyMethod_Type
+  // PyModuleDef_Type
+  // PyModule_Type
+  // PyODictItems_Type
+  // PyODictIter_Type
+  // PyODictKeys_Type
+  // PyODictValues_Type
+  // PyODict_Type
+  // PyPickleBuffer_Type
+  // PyProperty_Type
+  // PyRangeIter_Type
+  // PyRange_Type
+  // PyReversed_Type
+  // PySeqIter_Type
+  // PySetIter_Type
+  // PySlice_Type
+  // PyStaticMethod_Type
+  // PyStdPrinter_Type
+  // PySuper_Type
+  // PyTraceBack_Type
+  // PyTupleIter_Type
+  // PyTuple_Type
+  // PyType_Type
+  // PyUnicodeIter_Type
+  // PyWrapperDescr_Type
+  // PyZip_Type
 }
 
 int tk_python_val_lua (lua_State *L)
@@ -810,7 +925,7 @@ int tk_python_val_lua (lua_State *L)
     lua_pop(L, 1);
   }
 
-  tk_python_python_to_lua(L, -1, recurse);
+  tk_python_python_to_lua(L, -1, recurse, false);
   lua_remove(L, -2);
   return 1;
 }
@@ -837,7 +952,7 @@ int tk_python_call (lua_State *L, int nargs)
   {
     if (kwargs && i == kwargsi)
       continue;
-    PyObject *arg = tk_python_lua_to_python(L, i, false);
+    PyObject *arg = tk_python_lua_to_python(L, i, false, false);
     Py_INCREF(arg);
     if (PyTuple_SetItem(args, i + nargs, arg))
       return tk_python_error(L);
@@ -875,17 +990,18 @@ int tk_python_mt_call (lua_State *L)
     lua_pop(L, 1);
   }
 
-  PyObject *obj = tk_python_lua_to_python(L, -1, recurse);
+  PyObject *obj = tk_python_lua_to_python(L, -1, recurse, false);
   lua_remove(L, -2);
 
   tk_python_push_val(L, obj);
-  tk_python_python_to_lua(L, -1, false);
+  tk_python_python_to_lua(L, -1, false, false);
 
   return 1;
 }
 
 luaL_Reg tk_python_fns[] =
 {
+  { "bytes", tk_python_bytes },
   { "collect", tk_python_collect },
   { "close", tk_python_close },
   { "builtin", tk_python_builtin },
