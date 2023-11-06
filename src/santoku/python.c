@@ -462,12 +462,15 @@ int tk_python_open (lua_State *L)
     lua_remove(L, -2); // msg
 
     if (!same) {
-      lua_error(L);
-      return 0;
+      lua_pushboolean(L, 0); // msg bool
+      lua_insert(L, -2); // bool msg
+      return 2;
     } else {
       lua_pushboolean(L, 1); // msg bool
       lua_insert(L, -2); // bool msg
-      return 2;
+      lua_pushvalue(L, lua_upvalueindex(1)); // bool msg py
+      lua_insert(L, -2); // bool py msg
+      return 3;
     }
 
   }
@@ -490,8 +493,9 @@ int tk_python_open (lua_State *L)
   if (PyType_Ready(&tk_python_LuaVectorType) < 0)
     return tk_python_error(L);
 
-  lua_pushboolean(L, 1);
-  return 1;
+  lua_pushboolean(L, 1); // bool
+  lua_pushvalue(L, lua_upvalueindex(1)); // bool py
+  return 2;
 }
 
 // TODO: Combine with above
@@ -974,7 +978,6 @@ int tk_python_mt_call (lua_State *L)
 
 luaL_Reg tk_python_fns[] =
 {
-  { "open", tk_python_open },
   { "collect", tk_python_collect },
   { "close", tk_python_close },
   { "builtin", tk_python_builtin },
@@ -1026,5 +1029,6 @@ int luaopen_santoku_python (lua_State *L)
   lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_EPHEMERON_IDX); // t
   lua_setfield(L, -2, "EPHEMERON_IDX"); //
 
+  lua_pushcclosure(L, tk_python_open, 1);
   return 1;
 }
