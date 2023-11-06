@@ -785,15 +785,6 @@ void tk_python_python_to_lua (lua_State *L, int i, bool recurse)
 
     lua_pushlstring(L, str, len);
 
-  } else if (Py_IS_TYPE(obj, &PyBytes_Type)) {
-
-    ssize_t len;
-    char *str;
-    if (PyBytes_AsStringAndSize(obj, &str, &len) == -1)
-      tk_python_error(L);
-
-    lua_pushlstring(L, str, len);
-
   } else if (Py_IS_TYPE(obj, &PyTuple_Type)) {
     tk_python_tuple_to_lua(L, i);
 
@@ -801,89 +792,6 @@ void tk_python_python_to_lua (lua_State *L, int i, bool recurse)
     tk_python_generic_to_lua(L, i);
   }
 
-  // PyBool_Type
-  // PyFloat_Type
-  // PyLong_Type
-  // PyDict_Type
-  // PyList_Type
-  // PyTuple_Type
-  //
-  // PyUnicode_Type
-  // PyBytes_Type
-  //
-  // PyFunction_Type
-  // PyCFunction_Type
-  // PyCMethod_Type
-  // PyClassMethod_Type
-  // PyInstanceMethod_Type
-  //
-  // PyMap_Type
-  // PySet_Type
-  //
-  // PyAsyncGen_Type
-  // PyBaseObject_Type
-  // PyByteArrayIter_Type
-  // PyByteArray_Type
-  // PyBytesIter_Type
-  // PyCallIter_Type
-  // PyCapsule_Type
-  // PyCell_Type
-  // PyClassMethodDescr_Type
-  // PyCode_Type
-  // PyComplex_Type
-  // PyContextToken_Type
-  // PyContextVar_Type
-  // PyContext_Type
-  // PyCoro_Type
-  // PyDictItems_Type
-  // PyDictIterItem_Type
-  // PyDictIterKey_Type
-  // PyDictIterValue_Type
-  // PyDictKeys_Type
-  // PyDictProxy_Type
-  // PyDictRevIterItem_Type
-  // PyDictRevIterKey_Type
-  // PyDictRevIterValue_Type
-  // PyDictValues_Type
-  // PyEllipsis_Type
-  // PyEnum_Type
-  // PyFilter_Type
-  // PyFrame_Type
-  // PyFrozenSet_Type
-  // PyGen_Type
-  // PyGetSetDescr_Type
-  // PyListIter_Type
-  // PyListRevIter_Type
-  // PyLongRangeIter_Type
-  // PyMemberDescr_Type
-  // PyMemoryView_Type
-  // PyMethodDescr_Type
-  // PyMethod_Type
-  // PyModuleDef_Type
-  // PyModule_Type
-  // PyODictItems_Type
-  // PyODictIter_Type
-  // PyODictKeys_Type
-  // PyODictValues_Type
-  // PyODict_Type
-  // PyPickleBuffer_Type
-  // PyProperty_Type
-  // PyRangeIter_Type
-  // PyRange_Type
-  // PyReversed_Type
-  // PySeqIter_Type
-  // PySetIter_Type
-  // PySlice_Type
-  // PyStaticMethod_Type
-  // PyStdPrinter_Type
-  // PySuper_Type
-  // PyTraceBack_Type
-  // PyTupleIter_Type
-  // PyTuple_Type
-  // PyType_Type
-  // PyUnicodeIter_Type
-  // PyWrapperDescr_Type
-  // PyZip_Type
 }
 
 int tk_python_val_lua (lua_State *L)

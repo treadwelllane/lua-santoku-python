@@ -93,8 +93,9 @@ test("python", function ()
 
     local str = "abc"
     local bytes = py.builtin("bytes")(str, "utf-8")
+    local str0 = bytes.decode("utf-8")
 
-    print(str, bytes)
+    assert.equals(str, str0)
 
   end)
 
