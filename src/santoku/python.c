@@ -394,7 +394,10 @@ int tk_python_error (lua_State *L)
 {
   PyObject *ptype, *pvalue, *ptrace;
   PyErr_Fetch(&ptype, &pvalue, &ptrace);
-  luaL_error(L, PyUnicode_AsUTF8(PyObject_Str(pvalue)));
+  lua_pushstring(L,  PyUnicode_AsUTF8(PyObject_Str(pvalue)));
+  lua_pushstring(L,  ": ");
+  lua_pushstring(L,  PyUnicode_AsUTF8(PyObject_Str(ptrace)));
+  lua_error(L);
   return 0;
 }
 
