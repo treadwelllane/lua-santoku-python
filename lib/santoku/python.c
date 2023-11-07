@@ -536,12 +536,16 @@ PyObject *tk_python_peek_val (lua_State *L, int i)
       (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS) != NULL)) {
     tk_python_get_ephemeron(L, i);
     PyObject *obj = tk_python_peek_val(L, -1);
+    Py_INCREF(obj);
+    Py_INCREF(obj);
     lua_pop(L, 1);
     return obj;
   } else {
     luaL_checkudata(L, i, TK_PYTHON_MT_VAL);
+    luaL_checkudata(L, i, TK_PYTHON_MT_VAL);
     tk_python_get_ephemeron(L, i);
     PyObject *obj = (PyObject *) lua_touserdata(L, -1);
+    Py_INCREF(obj);
     lua_pop(L, 1);
     return obj;
   }
@@ -555,11 +559,13 @@ PyObject *tk_python_peek_val_safe (lua_State *L, int i)
       (luaL_testudata(L, i, TK_PYTHON_MT_KWARGS) != NULL)) {
     tk_python_get_ephemeron(L, i);
     PyObject *obj = tk_python_peek_val(L, -1);
+    Py_INCREF(obj);
     lua_pop(L, 1);
     return obj;
   } else if (luaL_testudata(L, i, TK_PYTHON_MT_VAL) != NULL) {
     tk_python_get_ephemeron(L, i);
     PyObject *obj = (PyObject *) lua_touserdata(L, -1);
+    Py_INCREF(obj);
     lua_pop(L, 1);
     return obj;
   } else {

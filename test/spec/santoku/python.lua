@@ -1,8 +1,9 @@
 local assert = require("luassert")
 local test = require("santoku.test")
 local vec = require("santoku.vector")
-local py_open = require("santoku.python")
-local py
+local ok, py = require("santoku.python")("libpython3.11.so")
+
+assert.equals(true, ok, py)
 
 test("python", function ()
 
@@ -10,10 +11,7 @@ test("python", function ()
 
     local ok, msg
 
-    ok, py = py_open("libpython3.11.so")
-    assert.equals(true, ok, py)
-
-    ok, py, msg = py_open("libpython3.11.so")
+    ok, py, msg = require("santoku.python")("libpython3.11.so")
     assert.equals(true, ok, py)
     assert.equals(msg, "embedded python already open: libpython3.11.so")
 
@@ -104,6 +102,14 @@ test("python", function ()
     assert.equals(false, pcall(function ()
       np.array({}, {})
     end))
+  end)
+
+  test("error assertion", function ()
+    local exec = py.builtin("exec")
+    local ok, err = pcall(function ()
+      exec("assert false, test")
+    end)
+    assert.equals(false, ok, err)
   end)
 
 end)
