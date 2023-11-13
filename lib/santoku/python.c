@@ -1,5 +1,3 @@
-// TODO: Py_DECREF where needed
-
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdbool.h>
@@ -55,9 +53,11 @@ int tk_python_LuaTable_init
   PyObject *kwargs )
 {
   PyObject *lpo = PyTuple_GetItem(args, 0);
+  // Py_INCREF(lpo);
   if (!lpo) return -1;
 
   PyObject *refo = PyTuple_GetItem(args, 1);
+  // Py_INCREF(refo);
   if (!refo) return -1;
 
   PyObject *lpl = PyNumber_Long(lpo);
@@ -78,16 +78,21 @@ int tk_python_LuaTableIter_init
   PyObject *kwargs )
 {
   PyObject *source = PyTuple_GetItem(args, 0);
+  // Py_INCREF(source);
   if (!source) return -1;
 
   PyObject *isarrayi = PyTuple_GetItem(args, 1);
+  // Py_INCREF(isarrayi);
   if (!source) return -1;
 
   PyObject *maxni = PyTuple_GetItem(args, 2);
+  // Py_INCREF(maxni);
   if (!maxni) return -1;
 
   // TODO: Ensure type and throw error otherwise
   self->source = (tk_python_LuaTable *) source;
+
+  // TODO: Do we need to incref on source? Does it happen automatically?
   Py_INCREF(source);
 
   self->kref = LUA_NOREF;
@@ -106,7 +111,10 @@ int tk_python_LuaTableIter_init
 int tk_python_LuaTableIter_dealloc
 ( tk_python_LuaTableIter *self )
 {
+  // lua_State *L = (lua_State *) self->source->Lp;
+  // tk_python_unref(L, self->kref);
   Py_DECREF(self->source);
+  // Py_DECREF(self->source);
   return 0;
 }
 
@@ -145,6 +153,7 @@ PyObject *tk_python_LuaTableIter_next
       tk_python_deref(L, self->kref); // tbl k
 
     if (lua_next(L, -2) == 0) {
+      tk_python_unref(L, self->kref);
       lua_pop(L, 2);
       goto stop;
     }
@@ -560,8 +569,7 @@ PyObject *tk_python_peek_val (lua_State *L, int i)
       (tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS))) {
     tk_python_get_ephemeron(L, i);
     PyObject *obj = tk_python_peek_val(L, -1);
-    Py_INCREF(obj);
-    // Py_INCREF(obj); // TODO: Why two INCREFs?
+    // Py_INCREF(obj);
     lua_pop(L, 1);
     return obj;
   } else {
@@ -569,7 +577,7 @@ PyObject *tk_python_peek_val (lua_State *L, int i)
     luaL_checkudata(L, i, TK_PYTHON_MT_VAL);
     tk_python_get_ephemeron(L, i);
     PyObject *obj = (PyObject *) lua_touserdata(L, -1);
-    Py_INCREF(obj);
+    // Py_INCREF(obj);
     lua_pop(L, 1);
     return obj;
   }
@@ -583,13 +591,13 @@ PyObject *tk_python_peek_val_safe (lua_State *L, int i)
       tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS)) {
     tk_python_get_ephemeron(L, i);
     PyObject *obj = tk_python_peek_val(L, -1);
-    Py_INCREF(obj);
+    // Py_INCREF(obj);
     lua_pop(L, 1);
     return obj;
   } else if (tk_python_check_metatable(L, i, TK_PYTHON_MT_VAL)) {
     tk_python_get_ephemeron(L, i);
     PyObject *obj = (PyObject *) lua_touserdata(L, -1);
-    Py_INCREF(obj);
+    // Py_INCREF(obj);
     lua_pop(L, 1);
     return obj;
   } else {
@@ -668,6 +676,7 @@ int tk_python_builtin (lua_State *L)
   PyObject *builtin = PyObject_CallMethod(builtins, "get", "s", name);
   if (!builtin) return tk_python_error(L);
 
+  // Py_INCREF(builtin);
   tk_python_push_val(L, builtin); // str bi
   tk_python_python_to_lua(L, -1, false, false); // str bi lua
   lua_remove(L, -2); // str bi
@@ -743,7 +752,11 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse, bool force
 {
   if (!force_wrap) {
     PyObject *obj = tk_python_peek_val_safe(L, i);
-    if (obj) return obj;
+    // Py_INCREF(obj);
+    if (obj) {
+      Py_INCREF(obj);
+      return obj;
+    }
   }
 
   int type = lua_type(L, i);
@@ -772,7 +785,6 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse, bool force
     return Py_None;
 
   } else {
-    fprintf(stderr, "Unhandled Lua type, returning None: %d %p\n", type, lua_topointer(L, i));
     return Py_None;
   }
 
@@ -781,9 +793,12 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse, bool force
 int tk_python_generic_index (lua_State *L)
 {
   PyObject *obj = tk_python_peek_val(L, -2);
+  // Py_INCREF(obj);
   PyObject *attr = tk_python_lua_to_python(L, -1, false, false);
+  // Py_INCREF(attr);
 
   PyObject *mem = PyObject_GenericGetAttr(obj, attr);
+  // Py_INCREF(mem);
   if (!mem) return tk_python_error(L);
 
   tk_python_push_val(L, mem);
@@ -794,12 +809,14 @@ int tk_python_generic_index (lua_State *L)
 int tk_python_tuple_index (lua_State *L)
 {
   PyObject *tup = tk_python_peek_val(L, -2);
+  // Py_INCREF(tup);
 
   if (lua_type(L, -1) == LUA_TNUMBER) {
 
     lua_Number i = lua_tointeger(L, -1);
 
     PyObject *mem = PyTuple_GetItem(tup, i);
+    Py_INCREF(mem);
     if (!mem) return tk_python_error(L);
 
     tk_python_push_val(L, mem);
@@ -843,6 +860,7 @@ void tk_python_tuple_to_lua (lua_State *L, int i)
 void tk_python_python_to_lua (lua_State *L, int i, bool recurse, bool force_generic)
 {
   PyObject *obj = tk_python_peek_val(L, i);
+  // Py_INCREF(obj);
 
   if (force_generic)
     goto generic;
@@ -1003,12 +1021,14 @@ int tk_python_call (lua_State *L, int nargs)
   {
     if (tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS)) {
       kwargs = tk_python_peek_val(L, i);
+      // Py_INCREF(kwargs);
       kwargsi = i;
       break;
     }
   }
 
   PyObject *fn = tk_python_peek_val(L, - (nargs + 1));
+  // Py_INCREF(fn);
   PyObject *args = PyTuple_New(kwargs ? nargs - 1 : nargs);
   if (!args) return tk_python_error(L);
 
@@ -1017,13 +1037,21 @@ int tk_python_call (lua_State *L, int nargs)
     if (kwargs && i == kwargsi)
       continue;
     PyObject *arg = tk_python_lua_to_python(L, i, false, false);
-    Py_INCREF(arg);
-    if (PyTuple_SetItem(args, i + nargs, arg))
+    // Py_INCREF(arg);
+    if (PyTuple_SetItem(args, i + nargs, arg)) {
+      // Py_DECREF(arg);
+      Py_DECREF(args);
       return tk_python_error(L);
+    }
   }
 
   PyObject *res = PyObject_Call(fn, args, kwargs);
-  if (!res) return tk_python_error(L);
+
+  if (!res) {
+    Py_DECREF(args);
+    return tk_python_error(L);
+  }
+
   Py_DECREF(args);
 
   tk_python_push_val(L, res);
@@ -1036,6 +1064,17 @@ int tk_python_val_call (lua_State *L)
   return 1;
 }
 
+// int tk_python_trace_allocated_objects_visitor (PyObject *o, void *arg)
+// {
+//   return 0;
+// }
+
+// int tk_python_trace_allocated_objects (lua_State *L)
+// {
+//   PyUnstable_GC_VisitObjects((gcvisitobjects_t) &tk_python_trace_allocated_objects_visitor, NULL);
+//   return 0;
+// }
+
 luaL_Reg tk_python_fns[] =
 {
   { "bytes", tk_python_bytes },
@@ -1044,6 +1083,7 @@ luaL_Reg tk_python_fns[] =
   { "builtin", tk_python_builtin },
   { "import", tk_python_import },
   { "kwargs", tk_python_kwargs },
+  // { "trace_allocated_objects", tk_python_trace_allocated_objects },
   { NULL, NULL }
 };
 
