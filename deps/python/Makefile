@@ -3,7 +3,6 @@ ifneq ($($(VPFX)_LOCAL_PYTHON),1)
 results.mk: Makefile
 	truncate -s0 results.mk
 	echo "LIB_CFLAGS += $(shell pkg-config --cflags python3-embed)" >> results.mk
-	echo "LIB_LDFLAGS += $(shell pkg-config --libs python3-embed)" >> results.mk
 
 else
 
@@ -16,7 +15,6 @@ export PIP = $(PRELOAD) $(CURDIR)/venv/bin/pip
 results.mk: Makefile cpython/$(LIB)
 	truncate -s0 results.mk
 	echo "LIB_CFLAGS += -I$(CURDIR)/cpython -I$(CURDIR)/cpython/Include" >> results.mk
-	echo "LIB_LDFLAGS += -L$(CURDIR)/cpython -lpython3.11" >> results.mk
 
 cpython/$(LIB):
 	[ ! -d cpython ] && \

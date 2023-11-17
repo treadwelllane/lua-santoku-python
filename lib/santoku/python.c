@@ -10,6 +10,8 @@
 #define TK_PYTHON_MT_GENERIC "santoku_python_generic"
 #define TK_PYTHON_MT_TUPLE "santoku_python_tuple"
 
+void *PYTHON = NULL;
+
 int TK_PYTHON_REF_IDX;
 int TK_PYTHON_EPHEMERON_IDX;
 
@@ -52,22 +54,22 @@ int tk_python_LuaTable_init
   PyObject *args,
   PyObject *kwargs )
 {
-  PyObject *lpo = PyTuple_GetItem(args, 0);
+  PyObject *lpo = ((PyObject *(*)(PyObject *, int)) dlsym(PYTHON, "PyTuple_GetItem"))(args, 0);
   // Py_INCREF(lpo);
   if (!lpo) return -1;
 
-  PyObject *refo = PyTuple_GetItem(args, 1);
+  PyObject *refo = ((PyObject *(*)(PyObject *, int)) dlsym(PYTHON, "PyTuple_GetItem"))(args, 1);
   // Py_INCREF(refo);
   if (!refo) return -1;
 
-  PyObject *lpl = PyNumber_Long(lpo);
+  PyObject *lpl = ((PyObject *(*)(PyObject *)) dlsym(PYTHON, "PyNumber_Long"))(lpo);
   if (!lpl) return -1;
 
-  PyObject *refl = PyNumber_Long(refo);
+  PyObject *refl = ((PyObject *(*)(PyObject *)) dlsym(PYTHON, "PyNumber_Long"))(refo);
   if (!refl) return -1;
 
-  self->Lp = PyLong_AsLongLong(lpl);
-  self->ref = PyLong_AsLongLong(refl);
+  self->Lp = ((long long (*)(PyObject *)) dlsym(PYTHON, "PyLong_AsLongLong"))(lpl);
+  self->ref = ((long long (*)(PyObject *)) dlsym(PYTHON, "PyLong_AsLongLong"))(refl);
 
   return 0;
 }
@@ -77,33 +79,48 @@ int tk_python_LuaTableIter_init
   PyObject *args,
   PyObject *kwargs )
 {
-  PyObject *source = PyTuple_GetItem(args, 0);
+  fprintf(stderr, "luatable_init 1\n");
+  PyObject *source = ((PyObject *(*)(PyObject *, int)) dlsym(PYTHON, "PyTuple_GetItem"))(args, 0);
+  fprintf(stderr, "luatable_init 2\n");
   // Py_INCREF(source);
   if (!source) return -1;
 
-  PyObject *isarrayi = PyTuple_GetItem(args, 1);
+  fprintf(stderr, "luatable_init 3\n");
+  PyObject *isarrayi = ((PyObject *(*)(PyObject *, int)) dlsym(PYTHON, "PyTuple_GetItem"))(args, 1);
+  fprintf(stderr, "luatable_init 4\n");
   // Py_INCREF(isarrayi);
   if (!source) return -1;
 
-  PyObject *maxni = PyTuple_GetItem(args, 2);
+  fprintf(stderr, "luatable_init 5\n");
+  PyObject *maxni = ((PyObject *(*)(PyObject *, int)) dlsym(PYTHON, "PyTuple_GetItem"))(args, 2);
+  fprintf(stderr, "luatable_init 6\n");
   // Py_INCREF(maxni);
   if (!maxni) return -1;
 
   // TODO: Ensure type and throw error otherwise
+  fprintf(stderr, "luatable_init 7\n");
   self->source = (tk_python_LuaTable *) source;
+  fprintf(stderr, "luatable_init 8\n");
 
   // TODO: Do we need to incref on source? Does it happen automatically?
   Py_INCREF(source);
+  fprintf(stderr, "luatable_init 9\n");
 
   self->kref = LUA_NOREF;
 
   // TODO: Use boolean, not long, and check type
-  int isarray = PyLong_AsLongLong(isarrayi);
+  fprintf(stderr, "luatable_init 10\n");
+  int isarray = ((long long (*)(PyObject *)) dlsym(PYTHON, "PyLong_AsLongLong"))(isarrayi);
+  fprintf(stderr, "luatable_init 11\n");
   self->isarray = isarray;
+  fprintf(stderr, "luatable_init 12\n");
 
   // TODO: Check type
-  int maxn = PyLong_AsLongLong(maxni);
+  fprintf(stderr, "luatable_init 13\n");
+  int maxn = ((long long (*)(PyObject *)) dlsym(PYTHON, "PyLong_AsLongLong"))(maxni);
+  fprintf(stderr, "luatable_init 14\n");
   self->maxn = maxn;
+  fprintf(stderr, "luatable_init 15\n");
 
   return 0;
 }
@@ -113,33 +130,40 @@ int tk_python_LuaTableIter_dealloc
 {
   // lua_State *L = (lua_State *) self->source->Lp;
   // tk_python_unref(L, self->kref);
-  Py_DECREF(self->source);
-  // Py_DECREF(self->source);
+  ((void (*)(PyObject *)) dlsym(PYTHON, "Py_DecRef"))((PyObject *) self->source);
+  // Py_DecRef(self->source);
   return 0;
 }
 
 PyObject *tk_python_LuaTableIter_next
 ( tk_python_LuaTableIter *self )
 {
+  fprintf(stderr, "luatable_next 1\n");
   lua_State *L = (lua_State *) self->source->Lp;
+  fprintf(stderr, "luatable_next 2\n");
 
   tk_python_deref(L, self->source->ref); // tbl
+  fprintf(stderr, "luatable_next 3\n");
 
   if (self->isarray) {
+    fprintf(stderr, "luatable_next 4\n");
 
     if (self->kref == LUA_NOREF)
       self->kref = 1;
     else
       self->kref ++;
 
+    fprintf(stderr, "luatable_next 5\n");
     if (self->kref > self->maxn) {
       lua_pop(L, 1);
       goto stop;
     }
 
+    fprintf(stderr, "luatable_next 6\n");
     lua_pushinteger(L, self->kref); // tbl k
     lua_gettable(L, -2); // tbl v
 
+    fprintf(stderr, "luatable_next 7\n");
     PyObject *val = tk_python_lua_to_python(L, -1, false, false);
     lua_pop(L, 2);
 
@@ -147,24 +171,30 @@ PyObject *tk_python_LuaTableIter_next
 
   } else {
 
+    fprintf(stderr, "luatable_next 8\n");
     if (self->kref == LUA_NOREF)
       lua_pushnil(L); // tbl k
     else
       tk_python_deref(L, self->kref); // tbl k
 
+    fprintf(stderr, "luatable_next 9\n");
     if (lua_next(L, -2) == 0) {
       tk_python_unref(L, self->kref);
       lua_pop(L, 2);
       goto stop;
     }
 
+    fprintf(stderr, "luatable_next 10\n");
     PyObject *key = tk_python_lua_to_python(L, -2, false, false);
     PyObject *val = tk_python_lua_to_python(L, -1, false, false);
-    PyObject *ret = Py_BuildValue("(O O)", key, val);
+    PyObject *ret = ((PyObject *(*)(const char *, PyObject *, PyObject *)) dlsym(PYTHON, "Py_BuildValue"))("(O O)", key, val);
+    fprintf(stderr, "luatable_next 11\n");
 
+    fprintf(stderr, "luatable_next 12\n");
     if (self->kref != LUA_NOREF)
       tk_python_unref(L, self->kref);
 
+    fprintf(stderr, "luatable_next 13\n");
     self->kref = tk_python_ref(L, -2);
     lua_pop(L, 3);
 
@@ -173,7 +203,12 @@ PyObject *tk_python_LuaTableIter_next
   }
 
 stop:
-  PyErr_SetObject(PyExc_StopIteration, Py_None);
+  fprintf(stderr, "luatable_next 14\n");
+  PyObject *exc = dlsym(PYTHON, "PyExc_StopIteration");
+  PyObject *none = dlsym(PYTHON, "_Py_NoneStruct");
+  fprintf(stderr, "luatable_next 14 %p %p\n", exc, none);
+  ((void (*)(PyObject *, PyObject *)) dlsym(PYTHON, "PyErr_SetObject"))(exc, none);
+  fprintf(stderr, "luatable_next 15\n");
   return NULL;
 
 }
@@ -206,7 +241,7 @@ PyObject *tk_python_LuaTable_iter
   }
 
   PyObject *class = (PyObject *) &tk_python_LuaTableIterType;
-  PyObject *obj = PyObject_CallFunction(class, "O i L", (PyObject *) self, isarray, maxn);
+  PyObject *obj = ((PyObject *(*)(PyObject *, const char *, ...)) dlsym(PYTHON, "PyObject_CallFunction"))(class, "O i L", (PyObject *) self, isarray, maxn);
   if (!obj) { tk_python_error(L); return NULL; };
 
   return obj;
@@ -227,7 +262,7 @@ PyTypeObject tk_python_LuaVectorType = {
   .tp_basicsize = sizeof(tk_python_LuaVector),
   .tp_itemsize = 0,
   .tp_flags = Py_TPFLAGS_DEFAULT,
-  .tp_new = PyType_GenericNew,
+  .tp_new = NULL,
   .tp_init = (initproc) tk_python_LuaTable_init,
   .tp_dealloc = (destructor) tk_python_LuaTable_dealloc,
   .tp_iter = (getiterfunc) tk_python_LuaTable_iter,
@@ -364,7 +399,7 @@ PyTypeObject tk_python_LuaTableType = {
   .tp_basicsize = sizeof(tk_python_LuaTable),
   .tp_itemsize = 0,
   .tp_flags = Py_TPFLAGS_DEFAULT,
-  .tp_new = PyType_GenericNew,
+  .tp_new = NULL,
   .tp_init = (initproc) tk_python_LuaTable_init,
   .tp_dealloc = (destructor) tk_python_LuaTable_dealloc,
   .tp_iter = (getiterfunc) tk_python_LuaTable_iter,
@@ -377,7 +412,7 @@ PyTypeObject tk_python_LuaTableIterType = {
   .tp_basicsize = sizeof(tk_python_LuaTableIter),
   .tp_itemsize = 0,
   .tp_flags = Py_TPFLAGS_DEFAULT,
-  .tp_new = PyType_GenericNew,
+  .tp_new = NULL,
   .tp_init = (initproc) tk_python_LuaTableIter_init,
   .tp_dealloc = (destructor) tk_python_LuaTableIter_dealloc,
   .tp_iter = (getiterfunc) tk_python_LuaTableIter_iter,
@@ -402,10 +437,10 @@ void tk_lua_callmod (lua_State *L, int nargs, int nret, const char *smod, const 
 int tk_python_error (lua_State *L)
 {
   PyObject *ptype, *pvalue, *traceback;
-  PyErr_Fetch(&ptype, &pvalue, &traceback);
+  ((void (*)(PyObject **, PyObject **, PyObject **)) dlsym(PYTHON, "PyErr_Fetch"))(&ptype, &pvalue, &traceback);
 
   int n = 1;
-  lua_pushstring(L,  PyUnicode_AsUTF8(PyObject_Str(pvalue)));
+  lua_pushstring(L,  ((char *(*)(PyObject *)) dlsym(PYTHON, "PyUnicode_AsUTF8"))(((PyObject *(*)(PyObject *)) dlsym(PYTHON, "PyObject_Str"))(pvalue)));
 
   PyTracebackObject* traceRoot = (PyTracebackObject*)traceback;
   PyTracebackObject* pTrace = traceRoot;
@@ -413,11 +448,11 @@ int tk_python_error (lua_State *L)
   while (pTrace != NULL)
   {
     PyFrameObject* frame = pTrace->tb_frame;
-    PyCodeObject* code = PyFrame_GetCode(frame);
+    PyCodeObject* code = ((PyCodeObject *(*)(PyFrameObject *)) dlsym(PYTHON, "PyFrame_GetCode"))(frame);
 
-    int lineNr = PyFrame_GetLineNumber(frame);
-    const char *sCodeName = PyUnicode_AsUTF8(code->co_name);
-    const char *sFileName = PyUnicode_AsUTF8(code->co_filename);
+    int lineNr = ((int (*)(PyFrameObject *)) dlsym(PYTHON, "PyFrame_GetLineNumber"))(frame);
+    const char *sCodeName = ((char *(*)(PyObject *)) dlsym(PYTHON, "PyUnicode_AsUTF8"))(code->co_name);
+    const char *sFileName = ((char *(*)(PyObject *)) dlsym(PYTHON, "PyUnicode_AsUTF8"))(code->co_filename);
 
     lua_pushstring(L, "\n  at %s (%s:%d);");
     lua_pushstring(L, sCodeName);
@@ -428,7 +463,7 @@ int tk_python_error (lua_State *L)
     lua_call(L, 4, 1);
     n ++;
     pTrace = pTrace->tb_next;
-    Py_DECREF(code);
+    ((void (*)(PyObject *)) dlsym(PYTHON, "Py_DecRef"))((PyObject *) code);
   }
 
   lua_concat(L, n);
@@ -463,18 +498,16 @@ void tk_python_deref (lua_State *L, int ref)
 
 void tk_python_push_val (lua_State *, PyObject *);
 
-void *PYTHON = NULL;
-
 int tk_python_close (lua_State *L)
 {
   dlclose(PYTHON);
-  Py_Finalize();
+  ((void (*)(void)) dlsym(PYTHON, "Py_Finalize"))();
   return 0;
 }
 
 int tk_python_collect (lua_State *L)
 {
-  ssize_t res = PyGC_Collect();
+  ssize_t res = ((ssize_t (*)(void)) dlsym(PYTHON, "PyGC_Collect"))();
   lua_pushinteger(L, res);
   return 1;
 }
@@ -518,18 +551,22 @@ int tk_python_open (lua_State *L)
 
   PYTHON = dlopen(lib, RTLD_NOW | RTLD_GLOBAL);
 
+  tk_python_LuaVectorType.tp_new = dlsym(PYTHON, "PyType_GenericNew");
+  tk_python_LuaTableType.tp_new = dlsym(PYTHON, "PyType_GenericNew");
+  tk_python_LuaTableIterType.tp_new = dlsym(PYTHON, "PyType_GenericNew");
+
   if (PYTHON == NULL)
     luaL_error(L, "Error loading python library");
 
-  Py_Initialize();
+  ((void (*)(void)) dlsym(PYTHON, "Py_Initialize"))();
 
-  if (PyType_Ready(&tk_python_LuaTableType) < 0)
+  if (((int (*)(PyTypeObject *)) dlsym(PYTHON, "PyType_Ready"))(&tk_python_LuaTableType) < 0)
     return tk_python_error(L);
 
-  if (PyType_Ready(&tk_python_LuaTableIterType) < 0)
+  if (((int (*)(PyTypeObject *)) dlsym(PYTHON, "PyType_Ready"))(&tk_python_LuaTableIterType) < 0)
     return tk_python_error(L);
 
-  if (PyType_Ready(&tk_python_LuaVectorType) < 0)
+  if (((int (*)(PyTypeObject *)) dlsym(PYTHON, "PyType_Ready"))(&tk_python_LuaVectorType) < 0)
     return tk_python_error(L);
 
   lua_pushboolean(L, 1); // bool
@@ -659,7 +696,7 @@ int tk_python_bytes (lua_State *L)
   unsigned long len;
   const char *str = lua_tolstring(L, -1, &len);
 
-  PyObject *bytes = PyBytes_FromStringAndSize(str, len);
+  PyObject *bytes = ((PyObject *(*)(const char *, unsigned long)) dlsym(PYTHON, "PyBytes_FromStringAndSize"))(str, len);
   tk_python_push_val(L, bytes); // str bi
   tk_python_python_to_lua(L, -1, false, true);
   return 1;
@@ -670,10 +707,10 @@ int tk_python_builtin (lua_State *L)
   luaL_checktype(L, -1, LUA_TSTRING);
   const char *name = lua_tostring(L, -1);
 
-  PyObject *builtins = PyEval_GetBuiltins();
+  PyObject *builtins = ((PyObject *(*)(void)) dlsym(PYTHON, "PyEval_GetBuiltins"))();
   if (!builtins) return tk_python_error(L);
 
-  PyObject *builtin = PyObject_CallMethod(builtins, "get", "s", name);
+  PyObject *builtin = ((PyObject *(*)(PyObject *, const char *, const char *, ...)) dlsym(PYTHON, "PyObject_CallMethod"))(builtins, "get", "s", name);
   if (!builtin) return tk_python_error(L);
 
   // Py_INCREF(builtin);
@@ -688,7 +725,7 @@ int tk_python_import (lua_State *L)
   luaL_checktype(L, -1, LUA_TSTRING);
   const char *name = lua_tostring(L, -1);
 
-  PyObject *lib = PyImport_ImportModule(name);
+  PyObject *lib = ((PyObject *(*)(const char *)) dlsym(PYTHON, "PyImport_ImportModule"))(name);
   if (!lib) return tk_python_error(L);
 
   tk_python_push_val(L, lib);
@@ -699,7 +736,7 @@ int tk_python_import (lua_State *L)
 int tk_python_val_gc (lua_State *L)
 {
   PyObject *obj = tk_python_peek_val(L, -1);
-  Py_DECREF(obj);
+  ((void (*)(PyObject *)) dlsym(PYTHON, "Py_DecRef"))((PyObject *) obj);
   return 0;
 }
 
@@ -720,14 +757,14 @@ PyObject *tk_python_table_to_python (lua_State *L, int i, bool recurse)
     if (isvec) {
 
       PyObject *class = (PyObject *) &tk_python_LuaVectorType;
-      PyObject *obj = PyObject_CallFunction(class, "L L", (intptr_t) L, ref);
+      PyObject *obj = ((PyObject *(*)(PyObject *, const char *, ...)) dlsym(PYTHON, "PyObject_CallFunction"))(class, "L L", (intptr_t) L, ref);
       if (!obj) { tk_python_error(L); return NULL; };
       return obj;
 
     } else {
 
       PyObject *class = (PyObject *) &tk_python_LuaTableType;
-      PyObject *obj = PyObject_CallFunction(class, "L L", (intptr_t) L, ref);
+      PyObject *obj = ((PyObject *(*)(PyObject *, const char *, ...)) dlsym(PYTHON, "PyObject_CallFunction"))(class, "L L", (intptr_t) L, ref);
       if (!obj) { tk_python_error(L); return NULL; };
       return obj;
 
@@ -764,16 +801,16 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse, bool force
   if (type == LUA_TSTRING) {
     unsigned long len;
     const char *str = lua_tolstring(L, i, &len);
-    return PyUnicode_FromStringAndSize(str, len);
+    return ((PyObject *(*)(const char *, unsigned long)) dlsym(PYTHON, "PyBytes_FromStringAndSize"))(str, len);
 
   } else if (type == LUA_TNUMBER) {
     lua_Number n = lua_tonumber(L, i);
     return fmod(n, 1) == 0
-      ? PyLong_FromLongLong((lua_Integer) n)
-      : PyFloat_FromDouble(n);
+      ? ((PyObject *(*)(long long)) dlsym(PYTHON, "PyLong_FromLongLong"))((lua_Integer) n)
+      : ((PyObject *(*)(double)) dlsym(PYTHON, "PyFloat_FromDouble"))(n);
 
   } else if (type == LUA_TBOOLEAN) {
-    return lua_toboolean(L, i) ? Py_True : Py_False;
+    return lua_toboolean(L, i) ? dlsym(PYTHON, "Py_True") : dlsym(PYTHON, "Py_False");
 
   } else if (type == LUA_TTABLE) {
     return tk_python_table_to_python(L, i, recurse);
@@ -782,10 +819,10 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse, bool force
     return tk_python_function_to_python(L, i);
 
   } else if (type == LUA_TNIL) {
-    return Py_None;
+    return dlsym(PYTHON, "Py_None");
 
   } else {
-    return Py_None;
+    return dlsym(PYTHON, "Py_None");
   }
 
 }
@@ -797,7 +834,7 @@ int tk_python_generic_index (lua_State *L)
   PyObject *attr = tk_python_lua_to_python(L, -1, false, false);
   // Py_INCREF(attr);
 
-  PyObject *mem = PyObject_GenericGetAttr(obj, attr);
+  PyObject *mem = ((PyObject *(*)(PyObject *, PyObject *)) dlsym(PYTHON, "PyObject_GenericGetAttr"))(obj, attr);
   // Py_INCREF(mem);
   if (!mem) return tk_python_error(L);
 
@@ -815,7 +852,7 @@ int tk_python_tuple_index (lua_State *L)
 
     lua_Number i = lua_tointeger(L, -1);
 
-    PyObject *mem = PyTuple_GetItem(tup, i);
+    PyObject *mem = ((PyObject *(*)(PyObject *, int)) dlsym(PYTHON, "PyTuple_GetItem"))(tup, i);
     Py_INCREF(mem);
     if (!mem) return tk_python_error(L);
 
@@ -865,35 +902,35 @@ void tk_python_python_to_lua (lua_State *L, int i, bool recurse, bool force_gene
   if (force_generic)
     goto generic;
 
-  if (Py_IS_TYPE(obj, &PyBool_Type)) {
-    lua_pushboolean(L, obj == Py_True ? 1 : 0);
+  if (Py_IS_TYPE(obj, dlsym(PYTHON, "PyBool_Type"))) {
+    lua_pushboolean(L, obj == dlsym(PYTHON, "Py_True") ? 1 : 0);
 
-  } else if (Py_IS_TYPE(obj, &PyFloat_Type)) {
-    lua_pushnumber(L, PyFloat_AsDouble(obj));
+  } else if (Py_IS_TYPE(obj, dlsym(PYTHON, "PyFloat_Type"))) {
+    lua_pushnumber(L, ((double (*)(PyObject *)) dlsym(PYTHON, "PyFloat_AsDouble"))(obj));
 
-  } else if (Py_IS_TYPE(obj, &PyLong_Type)) {
-    lua_pushinteger(L, PyLong_AsLongLong(obj));
+  } else if (Py_IS_TYPE(obj, dlsym(PYTHON, "PyLong_Type"))) {
+    lua_pushinteger(L, ((long long (*)(PyObject *)) dlsym(PYTHON, "PyLong_AsLongLong"))(obj));
 
-  } else if (Py_IS_TYPE(obj, &PyUnicode_Type)) {
+  } else if (Py_IS_TYPE(obj, dlsym(PYTHON, "PyUnicode_Type"))) {
 
     ssize_t len;
-    const char *str = PyUnicode_AsUTF8AndSize(obj, &len);
+    const char *str = ((char *(*)(PyObject *, ssize_t *)) dlsym(PYTHON, "PyUnicode_AsUTF8AndSize"))(obj, &len);
 
     if (!str)
       tk_python_error(L);
 
     lua_pushlstring(L, str, len);
 
-  } else if (Py_IS_TYPE(obj, &PyBytes_Type)) {
+  } else if (Py_IS_TYPE(obj, dlsym(PYTHON, "PyBytes_Type"))) {
 
     ssize_t len;
     char *str;
-    if (PyBytes_AsStringAndSize(obj, &str, &len) == -1)
+    if (((int (*)(PyObject *, char **, ssize_t *)) dlsym(PYTHON, "PyBytes_AsStringAndSize"))(obj, &str, &len) == -1)
       tk_python_error(L);
 
     lua_pushlstring(L, str, len);
 
-  } else if (Py_IS_TYPE(obj, &PyTuple_Type)) {
+  } else if (Py_IS_TYPE(obj, dlsym(PYTHON, "PyTuple_Type"))) {
     tk_python_tuple_to_lua(L, i);
 
   } else {
@@ -1014,9 +1051,13 @@ int tk_python_val_lua (lua_State *L)
 
 int tk_python_call (lua_State *L, int nargs)
 {
+  fprintf(stderr, "tk_python_call 1\n");
   int kwargsi = -1;
+  fprintf(stderr, "tk_python_call 2\n");
   PyObject *kwargs = NULL;
+  fprintf(stderr, "tk_python_call 3\n");
 
+  fprintf(stderr, "tk_python_call 4\n");
   for (int i = -nargs; i < 0; i ++)
   {
     if (tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS)) {
@@ -1026,35 +1067,41 @@ int tk_python_call (lua_State *L, int nargs)
       break;
     }
   }
+  fprintf(stderr, "tk_python_call 5\n");
 
   PyObject *fn = tk_python_peek_val(L, - (nargs + 1));
   // Py_INCREF(fn);
-  PyObject *args = PyTuple_New(kwargs ? nargs - 1 : nargs);
+  PyObject *args = ((PyObject *(*)(int)) dlsym(PYTHON, "PyTuple_New"))(kwargs ? nargs - 1 : nargs);
   if (!args) return tk_python_error(L);
 
+  fprintf(stderr, "tk_python_call 6\n");
   for (int i = -nargs; i < 0; i ++)
   {
     if (kwargs && i == kwargsi)
       continue;
     PyObject *arg = tk_python_lua_to_python(L, i, false, false);
     // Py_INCREF(arg);
-    if (PyTuple_SetItem(args, i + nargs, arg)) {
-      // Py_DECREF(arg);
-      Py_DECREF(args);
+    if (((int (*)(PyObject *, int, PyObject *)) dlsym(PYTHON, "PyTuple_SetItem"))(args, i + nargs, arg)) {
+      // Py_DecRef(arg);
+      ((void (*)(PyObject *)) dlsym(PYTHON, "Py_DecRef"))((PyObject *) args);
       return tk_python_error(L);
     }
   }
+  fprintf(stderr, "tk_python_call 7 %p %p %p\n", fn, args, kwargs);
 
-  PyObject *res = PyObject_Call(fn, args, kwargs);
+  PyObject *res = ((PyObject *(*)(PyObject *, PyObject *, PyObject *)) dlsym(PYTHON, "PyObject_Call"))(fn, args, kwargs);
+  fprintf(stderr, "tk_python_call 8\n");
 
   if (!res) {
-    Py_DECREF(args);
+    ((void (*)(PyObject *)) dlsym(PYTHON, "Py_DecRef"))((PyObject *) args);
     return tk_python_error(L);
   }
+  fprintf(stderr, "tk_python_call 9\n");
 
-  Py_DECREF(args);
+  ((void (*)(PyObject *)) dlsym(PYTHON, "Py_DecRef"))((PyObject *) args);
 
   tk_python_push_val(L, res);
+  fprintf(stderr, "tk_python_call 10\n");
   return 1;
 }
 
@@ -1129,5 +1176,6 @@ int luaopen_santoku_python (lua_State *L)
   lua_setfield(L, -2, "EPHEMERON_IDX"); //
 
   lua_pushcclosure(L, tk_python_open, 1);
+
   return 1;
 }
