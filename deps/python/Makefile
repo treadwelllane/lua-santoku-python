@@ -1,9 +1,13 @@
 ifneq ($($(VPFX)_LOCAL_PYTHON),1)
 
+ifndef $(VPFX)_PC_NAME
+$(VPFX)_PC_NAME = python3-embed
+endif
+
 results.mk: Makefile
 	truncate -s0 results.mk
-	echo "LIB_CFLAGS += $(shell pkg-config --cflags python3-embed)" >> results.mk
-	echo "LIB_LDFLAGS += $(shell pkg-config --libs python3-embed)" >> results.mk
+	echo "LIB_CFLAGS += $(shell pkg-config --cflags $($(VPFX)_PC_NAME))" >> results.mk
+	echo "LIB_LDFLAGS += $(shell pkg-config --libs $($(VPFX)_PC_NAME))" >> results.mk
 
 else
 
