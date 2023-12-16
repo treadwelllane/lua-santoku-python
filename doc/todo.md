@@ -1,5 +1,7 @@
 # Now
 
+- Catch assertion errors
+
 - TK_PYTHON_PC_NAME doesn't work passed via LUAROCKS_VARS
 - Use dlsym instead linking python to lua lib
 
