@@ -39,8 +39,8 @@ void tk_lua_callmod (lua_State *, int, int, const char *, const char *);
 int tk_python_ref (lua_State *, int);
 void tk_python_unref (lua_State *, int);
 void tk_python_deref (lua_State *, int);
-void tk_python_set_ephemeron (lua_State *, int);
-void tk_python_get_ephemeron (lua_State *, int);
+void tk_python_set_ephemeron (lua_State *, int, int);
+void tk_python_get_ephemeron (lua_State *, int, int);
 PyTypeObject tk_python_LuaTableIterType;
 PyObject *tk_python_lua_to_python (lua_State *, int, bool, bool);
 void tk_python_python_to_lua (lua_State *, int, bool, bool);
@@ -558,14 +558,14 @@ PyObject *tk_python_peek_val (lua_State *L, int i)
   if ((tk_python_check_metatable(L, i, TK_PYTHON_MT_GENERIC)) ||
       (tk_python_check_metatable(L, i, TK_PYTHON_MT_TUPLE)) ||
       (tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS))) {
-    tk_python_get_ephemeron(L, i);
+    tk_python_get_ephemeron(L, i, 1);
     PyObject *obj = tk_python_peek_val(L, -1);
     lua_pop(L, 1);
     return obj;
   } else {
     luaL_checkudata(L, i, TK_PYTHON_MT_VAL);
     luaL_checkudata(L, i, TK_PYTHON_MT_VAL);
-    tk_python_get_ephemeron(L, i);
+    tk_python_get_ephemeron(L, i, 1);
     PyObject *obj = (PyObject *) lua_touserdata(L, -1);
     lua_pop(L, 1);
     return obj;
@@ -578,12 +578,12 @@ PyObject *tk_python_peek_val_safe (lua_State *L, int i)
   if (tk_python_check_metatable(L, i, TK_PYTHON_MT_GENERIC) ||
       tk_python_check_metatable(L, i, TK_PYTHON_MT_TUPLE) ||
       tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS)) {
-    tk_python_get_ephemeron(L, i);
+    tk_python_get_ephemeron(L, i, 1);
     PyObject *obj = tk_python_peek_val(L, -1);
     lua_pop(L, 1);
     return obj;
   } else if (tk_python_check_metatable(L, i, TK_PYTHON_MT_VAL)) {
-    tk_python_get_ephemeron(L, i);
+    tk_python_get_ephemeron(L, i, 1);
     PyObject *obj = (PyObject *) lua_touserdata(L, -1);
     lua_pop(L, 1);
     return obj;
@@ -592,32 +592,50 @@ PyObject *tk_python_peek_val_safe (lua_State *L, int i)
   }
 }
 
-void tk_python_set_ephemeron (lua_State *L, int iv)
+void tk_python_set_ephemeron (lua_State *L, int iu, int ie)
 {
   // eph
-  luaL_checktype(L, iv, LUA_TUSERDATA);
-  lua_pushvalue(L, iv); // eph val
+  luaL_checktype(L, iu, LUA_TUSERDATA);
+  lua_pushvalue(L, iu); // eph val
   lua_insert(L, -2); // val eph
   lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_EPHEMERON_IDX); // val eph idx
-  lua_insert(L, -3); // idx val eph
-  lua_settable(L, -3); // idx
-  lua_pop(L, 1);
+  lua_pushvalue(L, -3); // val eph idx val
+  lua_gettable(L, -2); // val eph idx epht
+  if (lua_type(L, -1) == LUA_TNIL) {
+    lua_pop(L, 1); // val eph idx
+    lua_pushvalue(L, -3); // val eph idx val
+    lua_newtable(L); // val eph idx val epht
+    lua_settable(L, -3); // val eph idx
+    lua_pushvalue(L, -3); // val eph idx val
+    lua_gettable(L, -2); // val eph idx epht
+  }
+  lua_pushinteger(L, ie); // val eph idx epht ie
+  lua_pushvalue(L, -4); // val eph idx epht ie eph
+  lua_settable(L, -3); // val eph idx epht
+  lua_pop(L, 4); //
 }
 
-void tk_python_get_ephemeron (lua_State *L, int iv)
+void tk_python_get_ephemeron (lua_State *L, int iu, int ie)
 {
-  lua_pushvalue(L, iv); // val
+  lua_pushvalue(L, iu); // val
   lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_EPHEMERON_IDX); // val idx
   lua_insert(L, -2); // idx val
-  lua_gettable(L, -2); // idx eph
-  lua_remove(L, -2); // eph
+  lua_gettable(L, -2); // idx epht
+  if (lua_type(L, -1) == LUA_TNIL) {
+    lua_remove(L, -2); // eph
+  } else {
+    lua_pushinteger(L, ie); // idx epht ie
+    lua_gettable(L, -2); // idx epht eph
+    lua_remove(L, -2); // idx eph
+    lua_remove(L, -2); // eph
+  }
 }
 
 void tk_python_push_val (lua_State *L, PyObject *obj)
 {
   lua_newuserdata(L, 0);
   lua_pushlightuserdata(L, obj);
-  tk_python_set_ephemeron(L, -2);
+  tk_python_set_ephemeron(L, -2, 1);
   luaL_getmetatable(L, TK_PYTHON_MT_VAL);
   lua_setmetatable(L, -2);
 }
@@ -633,7 +651,7 @@ int tk_python_kwargs (lua_State *L)
 
   lua_newuserdata(L, 0); // fn tbl d ud
   lua_insert(L, -2); // fn tbl ud d
-  tk_python_set_ephemeron(L, -2); // fn tbl ud
+  tk_python_set_ephemeron(L, -2, 1); // fn tbl ud
   luaL_getmetatable(L, TK_PYTHON_MT_KWARGS);
   lua_setmetatable(L, -2);
 
@@ -823,7 +841,7 @@ void tk_python_generic_to_lua (lua_State *L, int i)
   lua_pushvalue(L, i); // val
   lua_newuserdata(L, 0); // val udata
   lua_insert(L, -2); // udata val
-  tk_python_set_ephemeron(L, -2); // udata
+  tk_python_set_ephemeron(L, -2, 1); // udata
   luaL_getmetatable(L, TK_PYTHON_MT_GENERIC);
   lua_setmetatable(L, -2);
 }
@@ -833,7 +851,7 @@ void tk_python_tuple_to_lua (lua_State *L, int i)
   lua_pushvalue(L, i); // val
   lua_newuserdata(L, 0); // val udata
   lua_insert(L, -2); // udata val
-  tk_python_set_ephemeron(L, -2); // udata
+  tk_python_set_ephemeron(L, -2, 1); // udata
   luaL_getmetatable(L, TK_PYTHON_MT_TUPLE);
   lua_setmetatable(L, -2);
 }
