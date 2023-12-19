@@ -206,22 +206,14 @@ collectgarbage()
 py.collect()
 collectgarbage()
 
--- local n = 0
--- print()
--- print("REF_IDX")
--- for k, v in pairs(py.REF_IDX) do
---   n = n + 1
---   print(k, v, require("santoku.inspect")(v))
---   if n > 100 then break end
--- end
+assert(py.REF_IDX.n == 0, "ref index count not equal to zero")
 
--- n = 0
--- print()
--- print("EPHEMERON_IDX")
--- for k, v in pairs(py.EPHEMERON_IDX) do
---   n = n + 1
---   print(k, v, require("santoku.inspect")(v))
---   if n > 100 then break end
--- end
+local n = 0
+for _ in pairs(py.EPHEMERON_IDX) do
+  n = n + 1
+  if n > 100 then break end
+end
+
+assert(n == 0, "ephemeron table not empty")
 
 py.close()

@@ -428,6 +428,26 @@ int tk_python_error (lua_State *L)
   return 0;
 }
 
+int tk_python_increment_refs (lua_State *L) {
+  lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX); // idx
+  lua_getfield(L, -1, "n"); // idx n
+  int n = lua_type(L, -1) == LUA_TNIL ? 1 : lua_tointeger(L, -1) + 1;
+  lua_pop(L, 1); // idx
+  lua_pushinteger(L, n); // idx n
+  lua_setfield(L, -2, "n"); // idx
+  lua_pop(L, 1); //
+}
+
+int tk_python_decrement_refs (lua_State *L) {
+  lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX); // idx
+  lua_getfield(L, -1, "n"); // idx n
+  int n = lua_type(L, -1) == LUA_TNIL ? 1 : lua_tointeger(L, -1) - 1;
+  lua_pop(L, 1); // idx
+  lua_pushinteger(L, n); // idx n
+  lua_setfield(L, -2, "n"); // idx
+  lua_pop(L, 1); //
+}
+
 int tk_python_ref (lua_State *L, int i)
 {
   lua_pushvalue(L, i); // val
@@ -435,6 +455,7 @@ int tk_python_ref (lua_State *L, int i)
   lua_insert(L, -2); // idx tbl
   int ref = luaL_ref(L, -2); // idx
   lua_pop(L, 1); //
+  tk_python_increment_refs(L);
   return ref;
 }
 
@@ -443,6 +464,7 @@ void tk_python_unref (lua_State *L, int ref)
   lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX); // idx
   luaL_unref(L, -1, ref);
   lua_pop(L, 1);
+  tk_python_decrement_refs(L);
 }
 
 void tk_python_deref (lua_State *L, int ref)
@@ -1096,20 +1118,25 @@ int luaopen_santoku_python (lua_State *L)
   lua_setfield(L, -2, "__index"); // mt mte
   lua_pop(L, 1); // mt
 
-  lua_newtable(L); // t
-  TK_PYTHON_REF_IDX = luaL_ref(L, LUA_REGISTRYINDEX);
-  lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX);
-  lua_setfield(L, -2, "REF_IDX");
+  lua_newtable(L); // mt t
+  lua_pushinteger(L, 0); // mt t n
+  lua_setfield(L, -2, "n"); // mt t
+  TK_PYTHON_REF_IDX = luaL_ref(L, LUA_REGISTRYINDEX); // mt
+  lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX); // mt t
+  lua_setfield(L, -2, "REF_IDX"); // mt
 
-  lua_newtable(L); // t
-  lua_newtable(L); // t mt
-  lua_pushstring(L, "k"); // t mt v
-  lua_setfield(L, -2, "__mode"); // t mt
-  lua_setmetatable(L, -2); // t
-  TK_PYTHON_EPHEMERON_IDX = luaL_ref(L, LUA_REGISTRYINDEX); //
-  lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_EPHEMERON_IDX); // t
-  lua_setfield(L, -2, "EPHEMERON_IDX"); //
+  lua_newtable(L); // mt t
+  lua_newtable(L); // mt t mt
+  lua_pushstring(L, "k"); // mt t mt v
+  lua_setfield(L, -2, "__mode"); // mt t mt
+  lua_setmetatable(L, -2); // mt t
+  TK_PYTHON_EPHEMERON_IDX = luaL_ref(L, LUA_REGISTRYINDEX); // mt
+  lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_EPHEMERON_IDX); // mt t
+  lua_setfield(L, -2, "EPHEMERON_IDX"); // mt
 
-  lua_pushcclosure(L, tk_python_open, 1);
+  lua_pushinteger(L, 0); // mt n
+  lua_setfield(L, -2, "REF_IDX_N"); // mt
+
+  lua_pushcclosure(L, tk_python_open, 1); // fn
   return 1;
 }
