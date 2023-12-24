@@ -10,10 +10,14 @@ local env = {
     "lua >= 5.1",
   },
 
-  test_dependencies = {
-    "santoku >= 0.0.151-1",
-    "santoku-test >= 0.0.4-1",
-    "luacov >= 0.15.0-1",
+  test = {
+    envs = { "deps/venv/venv/bin/activate" },
+    dependencies = {
+      "santoku >= 0.0.151-1",
+      "santoku-test >= 0.0.4-1",
+      "luassert >= 1.9.0-1",
+      "luacov >= 0.15.0-1",
+    }
   },
 
 }

@@ -428,7 +428,7 @@ int tk_python_error (lua_State *L)
   return 0;
 }
 
-int tk_python_increment_refs (lua_State *L) {
+void tk_python_increment_refs (lua_State *L) {
   lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX); // idx
   lua_getfield(L, -1, "n"); // idx n
   int n = lua_type(L, -1) == LUA_TNIL ? 1 : lua_tointeger(L, -1) + 1;
@@ -438,7 +438,7 @@ int tk_python_increment_refs (lua_State *L) {
   lua_pop(L, 1); //
 }
 
-int tk_python_decrement_refs (lua_State *L) {
+void tk_python_decrement_refs (lua_State *L) {
   lua_rawgeti(L, LUA_REGISTRYINDEX, TK_PYTHON_REF_IDX); // idx
   lua_getfield(L, -1, "n"); // idx n
   int n = lua_type(L, -1) == LUA_TNIL ? 1 : lua_tointeger(L, -1) - 1;
