@@ -11,7 +11,7 @@ local env = {
   },
 
   test = {
-    envs = { "test/deps/venv/venv/bin/activate" },
+    env_scripts = { "test/deps/venv/venv/bin/activate" },
     dependencies = {
       "santoku >= 0.0.151-1",
       "santoku-test >= 0.0.4-1",
