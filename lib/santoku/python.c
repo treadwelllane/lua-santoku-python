@@ -711,11 +711,46 @@ int tk_python_builtin (lua_State *L)
 
 int tk_python_import (lua_State *L)
 {
-  luaL_checktype(L, -1, LUA_TSTRING);
-  const char *name = lua_tostring(L, -1);
+  luaL_checktype(L, 1, LUA_TSTRING);
+  const char *name = lua_tostring(L, 1);
 
-  PyObject *lib = PyImport_ImportModule(name);
+  int n = lua_gettop(L);
+
+  if (n == 1)
+  {
+    PyObject *lib = PyImport_ImportModule(name);
+    if (!lib) return tk_python_error(L);
+
+    tk_python_push_val(L, lib);
+    tk_python_python_to_lua(L, -1, false, false);
+    return 1;
+  }
+
+  PyObject *fromlist = PyList_New(0);
+  if (!fromlist) return tk_python_error(L);
+
+  for (int i = 1; i < n; i ++)
+  {
+    luaL_checktype(L, i + 1, LUA_TSTRING);
+    const char *submod = lua_tostring(L, i + 1);
+    PyObject *submodobj = PyUnicode_FromString(submod);
+
+    int rc = PyList_Append(fromlist, submodobj);
+    Py_DECREF(submodobj);
+
+    if (rc == -1)
+    {
+      Py_DECREF(fromlist);
+      return tk_python_error(L);
+    }
+  }
+
+  PyObject *lib = PyImport_ImportModuleEx(name, NULL, NULL, fromlist);
+  Py_DECREF(fromlist);
+
   if (!lib) return tk_python_error(L);
+
+  Py_DECREF(fromlist);
 
   tk_python_push_val(L, lib);
   tk_python_python_to_lua(L, -1, false, false);

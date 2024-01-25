@@ -2,8 +2,7 @@
 
 - Catch assertion errors
 
-- TK_PYTHON_PC_NAME doesn't work passed via LUAROCKS_VARS
-- Use dlsym instead linking python to lua lib
+- Double check if dlsym is still needed given toku lib update
 
 - Basic README
 - Documentation
