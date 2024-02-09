@@ -1,20 +1,26 @@
-local assert = require("luassert")
 local test = require("santoku.test")
-local vec = require("santoku.vector")
-local ok, py = require("santoku.python")("libpython3.11.so")
+local serialize = require("santoku.serialize") -- luacheck: ignore
 
-assert.equals(true, ok, py)
+local iter = require("santoku.iter")
+local collect = iter.collect
+local map = iter.map
+
+local err = require("santoku.error")
+local assert = err.assert
+
+local tbl = require("santoku.table")
+local teq = tbl.equals
+
+local validate = require("santoku.validate")
+local eq = validate.isequal
+
+local py = require("santoku.python")("libpython3.11.so")
 
 test("python", function ()
 
   test("open", function ()
-
-    local ok, msg
-
-    ok, py, msg = require("santoku.python")("libpython3.11.so")
-    assert.equals(true, ok, py)
-    assert.equals(msg, "embedded python already open: libpython3.11.so")
-
+    local _, msg, oldlib = require("santoku.python")("libpython3.11.so")
+    assert(teq({ msg, oldlib }, { "embedded python already open", "libpython3.11.so" }))
   end)
 
   py.collect()
@@ -25,7 +31,7 @@ test("python", function ()
   test("abs", function ()
     local abs = py.builtin("abs")
     local v = abs(-10)
-    assert.equals(10, v)
+    assert(eq(10, v))
   end)
 
   py.collect()
@@ -36,11 +42,23 @@ test("python", function ()
   test("list", function ()
     local list = py.builtin("list")
     local l = list({ 1, 2, 3, 4, 5 })
-    assert.equals(5, l.pop())
-    assert.equals(4, l.pop())
-    assert.equals(3, l.pop())
-    assert.equals(2, l.pop())
-    assert.equals(1, l.pop())
+    assert(eq(5, l.pop()))
+    assert(eq(4, l.pop()))
+    assert(eq(3, l.pop()))
+    assert(eq(2, l.pop()))
+    assert(eq(1, l.pop()))
+  end)
+
+  py.collect()
+  collectgarbage()
+  py.collect()
+  collectgarbage()
+
+  test("sequence protocol", function ()
+    assert(eq(3, py.builtin("len")({ 1, 2, 3 })))
+    assert(teq({ 1, 2, 3 }, collect(map(function (kv)
+      return kv[1]
+    end, py.builtin("enumerate")({ 1, 2, 3 })))))
   end)
 
   py.collect()
@@ -51,9 +69,9 @@ test("python", function ()
   test("dict", function ()
     local dict = py.builtin("dict")
     local d = dict({ a = 1, b = 2, c = 3 })
-    assert.equals(1, d.get("a"))
-    assert.equals(2, d.get("b"))
-    assert.equals(3, d.get("c"))
+    assert(eq(1, d.get("a")))
+    assert(eq(2, d.get("b")))
+    assert(eq(3, d.get("c")))
   end)
 
   py.collect()
@@ -64,9 +82,9 @@ test("python", function ()
   test("dict kwargs", function ()
     local dict = py.builtin("dict")
     local d = dict(py.kwargs({ a = 1, b = 2, c = 3 }))
-    assert.equals(1, d.get("a"))
-    assert.equals(2, d.get("b"))
-    assert.equals(3, d.get("c"))
+    assert(eq(1, d.get("a")))
+    assert(eq(2, d.get("b")))
+    assert(eq(3, d.get("c")))
   end)
 
   py.collect()
@@ -74,43 +92,34 @@ test("python", function ()
   py.collect()
   collectgarbage()
 
-  test("list vec", function ()
-    local list = py.builtin("list")
-    local l = list(vec(1, 2, 3, 4))
-    assert.equals(4, l.pop())
-    assert.equals(3, l.pop())
-    assert.equals(2, l.pop())
-    assert.equals(1, l.pop())
-  end)
-
   py.collect()
   collectgarbage()
   py.collect()
   collectgarbage()
 
-  test("numpy concat vec", function ()
+  test("numpy concat", function ()
     local np = py.import("numpy")
-    local a = np.array(vec(1, 2))
-    local b = np.array(vec(3, 4))
-    assert.equals(1, a.item(0))
-    assert.equals(2, a.item(1))
-    assert.equals(3, b.item(0))
-    assert.equals(4, b.item(1))
-    local c = vec(a, b)
-    assert.equals(a, c:get(1))
-    assert.equals(b, c:get(2))
+    local a = np.array({ 1, 2 })
+    local b = np.array({ 3, 4 })
+    assert(eq(1, a.item(0)))
+    assert(eq(2, a.item(1)))
+    assert(eq(3, b.item(0)))
+    assert(eq(4, b.item(1)))
+    local c = { a, b }
+    assert(eq(a, c[1]))
+    assert(eq(b, c[2]))
     local d = np.array(c)
-    assert.same({ 2, 2 }, { d.shape[0], d.shape[1] })
-    assert.equals(1, d.item(0))
-    assert.equals(2, d.item(1))
-    assert.equals(3, d.item(2))
-    assert.equals(4, d.item(3))
+    assert(teq({ 2, 2 }, { d.shape[0], d.shape[1] }))
+    assert(eq(1, d.item(0)))
+    assert(eq(2, d.item(1)))
+    assert(eq(3, d.item(2)))
+    assert(eq(4, d.item(3)))
     local e = np.concatenate(d)
-    assert.same({ 4 }, { e.shape[0] })
-    assert.equals(1, e.item(0))
-    assert.equals(2, e.item(1))
-    assert.equals(3, e.item(2))
-    assert.equals(4, e.item(3))
+    assert(teq({ 4 }, { e.shape[0] }))
+    assert(eq(1, e.item(0)))
+    assert(eq(2, e.item(1)))
+    assert(eq(3, e.item(2)))
+    assert(eq(4, e.item(3)))
   end)
 
   py.collect()
@@ -124,7 +133,7 @@ test("python", function ()
     local bytes = py.bytes(str)
     local str0 = bytes.decode("utf-8")
 
-    assert.equals(str, str0)
+    assert(eq(str, str0))
 
   end)
 
@@ -135,10 +144,10 @@ test("python", function ()
 
   test("error", function ()
     local np = py.import("numpy")
-    assert.equals(false, pcall(function ()
+    assert(eq(false, pcall(function ()
       local a, b = {}, {}
       np.array(a, b)
-    end))
+    end)))
   end)
 
   py.collect()
@@ -151,7 +160,7 @@ test("python", function ()
     local ok, err = pcall(function ()
       exec("assert false, test")
     end)
-    assert.equals(false, ok, err)
+    assert(eq(false, ok), err)
   end)
 
   py.collect()
@@ -162,19 +171,19 @@ test("python", function ()
   test("lots of arrays", function ()
     local np = py.import("numpy")
     local range = py.builtin("range")
-    local arrays = vec()
-    for _ = 1, 10000 do
+    local arrays = {}
+    for i = 1, 10000 do
       local rng = range(1000)
       local ar = np.array(rng)
-      arrays:append(ar)
+      arrays[i] = ar
     end
     np.vstack(arrays)
     np.vstack(arrays)
-    arrays = vec()
-    for _ = 1, 10000 do
+    arrays = {}
+    for i = 1, 10000 do
       local rng = range(1000)
       local ar = np.array(rng)
-      arrays:append(ar)
+      arrays[i] = ar
     end
     np.vstack(arrays)
   end)
@@ -185,7 +194,7 @@ test("python", function ()
   collectgarbage()
 
   test("Nones are collected", function ()
-    local _, py = require("santoku.python")("libpython3.11.so")
+    local py = require("santoku.python")("libpython3.11.so")
     py.import("numpy")
     py.import("numpy")
     local dict = py.builtin("dict")

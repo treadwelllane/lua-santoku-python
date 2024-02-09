@@ -8,6 +8,7 @@
 #define TK_PYTHON_MT_VAL "santoku_python_val"
 #define TK_PYTHON_MT_KWARGS "santoku_python_kwargs"
 #define TK_PYTHON_MT_GENERIC "santoku_python_generic"
+#define TK_PYTHON_MT_ITER "santoku_python_iter"
 #define TK_PYTHON_MT_TUPLE "santoku_python_tuple"
 
 int TK_PYTHON_REF_IDX;
@@ -183,18 +184,12 @@ PyObject *tk_python_LuaTable_iter
   lua_State *L = (lua_State *) self->Lp;
 
   tk_python_deref(L, self->ref); // tbl
-  tk_lua_callmod(L, 1, 1, "santoku.compat", "isarray"); // bool
-
-  int isarray = lua_toboolean(L, -1);
+  lua_Integer maxn = lua_objlen(L, -1);
+  bool isarray = maxn > 0;
   lua_pop(L, 1);
 
-  lua_Integer maxn = -1;
-  if (isarray) {
-    tk_python_deref(L, self->ref); // tbl
-    tk_lua_callmod(L, 1, 1, "santoku.table", "len"); // bool
-    maxn = lua_tointeger(L, -1);
-    lua_pop(L, 1);
-  }
+  if (!isarray)
+    maxn = -1;
 
   PyObject *class = (PyObject *) &tk_python_LuaTableIterType;
   PyObject *obj = PyObject_CallFunction(class, "O i L", (PyObject *) self, isarray, maxn);
@@ -228,39 +223,10 @@ PyTypeObject tk_python_LuaVectorType = {
 Py_ssize_t tk_python_LuaVector_sq_length (tk_python_LuaVector *self)
 {
   lua_State *L = (lua_State *) self->Lp;
-  tk_python_deref(L, self->ref);
-  tk_lua_callmod(L, 1, 1, "santoku.table", "len");
-  lua_Integer l = lua_tointeger(L, -1);
-  lua_pop(L, 1);
+  tk_python_deref(L, self->ref); // obj
+  lua_Integer l = lua_objlen(L, -1); // obj
+  lua_pop(L, 1); //
   return l;
-}
-
-PyObject *tk_python_LuaVector_sq_concat (tk_python_LuaVector *a, tk_python_LuaVector *b)
-{
-  lua_State *L = (lua_State *) a->Lp;
-  tk_lua_callmod(L, 0, 1, "santoku.vector", "pack");
-  tk_python_deref(L, a->ref);
-  tk_python_deref(L, b->ref);
-  tk_lua_callmod(L, 3, 1, "santoku.vector", "extend");
-
-  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
-  if (!obj) { tk_python_error(L); return NULL; };
-  return obj;
-}
-
-PyObject *tk_python_LuaVector_sq_repeat (tk_python_LuaVector *a, Py_ssize_t n)
-{
-  lua_State *L = (lua_State *) a->Lp;
-  tk_lua_callmod(L, 0, 1, "santoku.vector", "pack"); // v
-  tk_python_deref(L, a->ref); // v v
-  tk_lua_callmod(L, 2, 1, "santoku.vector", "extend"); // v
-  lua_pushinteger(L, n); // v n
-  tk_lua_callmod(L, 2, 1, "santoku.vector", "replicate"); // v
-
-  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
-  if (!obj) { tk_python_error(L); return NULL; };
-
-  return obj;
 }
 
 PyObject *tk_python_LuaVector_sq_item (tk_python_LuaVector *a, Py_ssize_t n)
@@ -268,70 +234,8 @@ PyObject *tk_python_LuaVector_sq_item (tk_python_LuaVector *a, Py_ssize_t n)
   lua_State *L = (lua_State *) a->Lp;
   tk_python_deref(L, a->ref); // v
   lua_pushinteger(L, n + 1); // v n
-  tk_lua_callmod(L, 2, 1, "santoku.vector", "get"); // v
-
-  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
-  if (!obj) { tk_python_error(L); return NULL; };
-
-  return obj;
-}
-
-PyObject *tk_python_LuaVector_sq_ass_item (tk_python_LuaVector *a, Py_ssize_t n, tk_python_LuaVector *b)
-{
-  lua_State *L = (lua_State *) a->Lp;
-  tk_python_deref(L, a->ref); // v
-  lua_pushinteger(L, n + 1); // v n
-
-  if (b == NULL) {
-
-    lua_pushinteger(L, n + 1); // v n n
-    tk_lua_callmod(L, 3, 1, "santoku.vector", "remove"); // v
-
-  } else {
-
-    tk_python_deref(L, b->ref); // v n v
-    tk_lua_callmod(L, 3, 1, "santoku.vector", "set"); // v
-
-  }
-
-  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
-  if (!obj) { tk_python_error(L); return NULL; };
-
-  return obj;
-}
-
-PyObject *tk_python_LuaVector_sq_contains (tk_python_LuaVector *a, tk_python_LuaVector *b)
-{
-  lua_State *L = (lua_State *) a->Lp;
-  tk_python_deref(L, a->ref); // v
-  tk_python_deref(L, b->ref); // v v
-
-  tk_lua_callmod(L, 2, 1, "santoku.vector", "includes"); // v
-
-  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
-  if (!obj) { tk_python_error(L); return NULL; };
-  return obj;
-}
-
-PyObject *tk_python_LuaVector_sq_inplace_concat (tk_python_LuaVector *a, tk_python_LuaVector *b)
-{
-  lua_State *L = (lua_State *) a->Lp;
-  tk_python_deref(L, a->ref);
-  tk_python_deref(L, b->ref);
-  tk_lua_callmod(L, 2, 1, "santoku.vector", "extend");
-
-  PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
-  if (!obj) { tk_python_error(L); return NULL; };
-  return obj;
-}
-
-PyObject *tk_python_LuaVector_sq_inplace_repeat (tk_python_LuaVector *a, Py_ssize_t n)
-{
-  lua_State *L = (lua_State *) a->Lp;
-  tk_python_deref(L, a->ref); // v
-  lua_pushinteger(L, n); // v n
-  tk_lua_callmod(L, 2, 1, "santoku.vector", "replicate"); // v
-
+  lua_gettable(L, -2); // v vv
+  lua_remove(L, -2); // vv
   PyObject *obj = tk_python_lua_to_python(L, -1, false, false);
   if (!obj) { tk_python_error(L); return NULL; };
   return obj;
@@ -339,13 +243,7 @@ PyObject *tk_python_LuaVector_sq_inplace_repeat (tk_python_LuaVector *a, Py_ssiz
 
 PySequenceMethods tk_python_LuaVector_as_sequence = {
   .sq_length = (lenfunc) tk_python_LuaVector_sq_length,
-  .sq_concat = (binaryfunc) tk_python_LuaVector_sq_concat,
-  .sq_repeat = (ssizeargfunc) tk_python_LuaVector_sq_repeat,
   .sq_item = (ssizeargfunc) tk_python_LuaVector_sq_item,
-  .sq_ass_item = (ssizeobjargproc) tk_python_LuaVector_sq_ass_item,
-  .sq_contains = (objobjproc) tk_python_LuaVector_sq_contains,
-  .sq_inplace_repeat = (ssizeargfunc) tk_python_LuaVector_sq_inplace_repeat,
-  .sq_inplace_concat = (binaryfunc) tk_python_LuaVector_sq_inplace_concat,
 };
 
 PyTypeObject tk_python_LuaTableType = {
@@ -508,20 +406,16 @@ int tk_python_open (lua_State *L)
 
     int same = liblen == oldliblen && !strncmp(lib, oldlib, fmin(liblen, oldliblen));
 
-    lua_pushstring(L, "embedded python already open: "); // lib oldlib msg
+    lua_pushstring(L, "embedded python already open"); // lib oldlib msg
     lua_insert(L, -2); // lib msg oldlib
-    lua_concat(L, 2); // lib msg
-    lua_remove(L, -2); // msg
+    lua_remove(L, -3); // msg oldlib
 
     if (!same) {
-      lua_pushboolean(L, 0); // msg bool
-      lua_insert(L, -2); // bool msg
-      return 2;
+      tk_lua_callmod(L, 2, 0, "santoku.error", "error"); // msg oldlib
+      return 0;
     } else {
-      lua_pushboolean(L, 1); // msg bool
-      lua_insert(L, -2); // bool msg
-      lua_pushvalue(L, lua_upvalueindex(1)); // bool msg py
-      lua_insert(L, -2); // bool py msg
+      lua_pushvalue(L, lua_upvalueindex(1)); // msg oldlib py
+      lua_insert(L, -3); // py msg oldlib
       return 3;
     }
 
@@ -545,9 +439,8 @@ int tk_python_open (lua_State *L)
   if (PyType_Ready(&tk_python_LuaVectorType) < 0)
     return tk_python_error(L);
 
-  lua_pushboolean(L, 1); // bool
-  lua_pushvalue(L, lua_upvalueindex(1)); // bool py
-  return 2;
+  lua_pushvalue(L, lua_upvalueindex(1)); // py
+  return 1;
 }
 
 int tk_python_check_metatable (lua_State *L, int i, char *mt)
@@ -579,6 +472,7 @@ PyObject *tk_python_peek_val (lua_State *L, int i)
 {
   if ((tk_python_check_metatable(L, i, TK_PYTHON_MT_GENERIC)) ||
       (tk_python_check_metatable(L, i, TK_PYTHON_MT_TUPLE)) ||
+      (tk_python_check_metatable(L, i, TK_PYTHON_MT_ITER)) ||
       (tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS))) {
     tk_python_get_ephemeron(L, i, 1);
     PyObject *obj = tk_python_peek_val(L, -1);
@@ -599,6 +493,7 @@ PyObject *tk_python_peek_val_safe (lua_State *L, int i)
 {
   if (tk_python_check_metatable(L, i, TK_PYTHON_MT_GENERIC) ||
       tk_python_check_metatable(L, i, TK_PYTHON_MT_TUPLE) ||
+      tk_python_check_metatable(L, i, TK_PYTHON_MT_ITER) ||
       tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS)) {
     tk_python_get_ephemeron(L, i, 1);
     PyObject *obj = tk_python_peek_val(L, -1);
@@ -773,10 +668,7 @@ PyObject *tk_python_table_to_python (lua_State *L, int i, bool recurse)
     // TODO: Support specific wrappers for
     // santoku tuples, generators, etc.
 
-    lua_pushvalue(L, i);
-    tk_lua_callmod(L, 1, 1, "santoku.vector", "isvec");
-    int isvec = lua_toboolean(L, -1);
-    lua_pop(L, 1);
+    int isvec = lua_objlen(L, i) > 0;
 
     if (isvec) {
 
@@ -886,6 +778,21 @@ int tk_python_tuple_index (lua_State *L)
   }
 }
 
+int tk_python_iter_call (lua_State *L)
+{
+  PyObject *iter = tk_python_peek_val(L, -1);
+  PyObject *next = PyIter_Next(iter);
+  if (next == NULL) {
+    if (PyErr_Occurred())
+      return tk_python_error(L);
+    return 0;
+  } else {
+    tk_python_push_val(L, next);
+    tk_python_python_to_lua(L, -1, false, false);
+    return 1;
+  }
+}
+
 int tk_python_generic_call (lua_State *L)
 {
   tk_python_val_call(L);
@@ -910,6 +817,16 @@ void tk_python_tuple_to_lua (lua_State *L, int i)
   lua_insert(L, -2); // udata val
   tk_python_set_ephemeron(L, -2, 1); // udata
   luaL_getmetatable(L, TK_PYTHON_MT_TUPLE);
+  lua_setmetatable(L, -2);
+}
+
+void tk_python_iter_to_lua (lua_State *L, int i)
+{
+  lua_pushvalue(L, i); // val
+  lua_newuserdata(L, 0); // val udata
+  lua_insert(L, -2); // udata val
+  tk_python_set_ephemeron(L, -2, 1); // udata
+  luaL_getmetatable(L, TK_PYTHON_MT_ITER);
   lua_setmetatable(L, -2);
 }
 
@@ -950,6 +867,9 @@ void tk_python_python_to_lua (lua_State *L, int i, bool recurse, bool force_gene
 
   } else if (Py_IS_TYPE(obj, &PyTuple_Type)) {
     tk_python_tuple_to_lua(L, i);
+
+  } else if (PyIter_Check(obj)) {
+    tk_python_iter_to_lua(L, i);
 
   } else {
     goto generic;
@@ -1145,6 +1065,11 @@ int luaopen_santoku_python (lua_State *L)
   lua_pushcfunction(L, tk_python_generic_index);
   lua_setfield(L, -2, "__index"); // mt mte
   lua_pushcfunction(L, tk_python_generic_call);
+  lua_setfield(L, -2, "__call"); // mt mte
+  lua_pop(L, 1); // mt
+
+  luaL_newmetatable(L, TK_PYTHON_MT_ITER); // mt mte
+  lua_pushcfunction(L, tk_python_iter_call);
   lua_setfield(L, -2, "__call"); // mt mte
   lua_pop(L, 1); // mt
 

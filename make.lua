@@ -1,7 +1,7 @@
 local env = {
 
   name = "santoku-python",
-  version = "0.0.35-1",
+  version = "0.0.36-1",
   variable_prefix = "TK_PYTHON",
   license = "MIT",
   public = true,
@@ -13,10 +13,8 @@ local env = {
   test = {
     env_scripts = { "test/deps/venv/venv/bin/activate" },
     dependencies = {
-      "santoku >= 0.0.162-1",
-      "santoku-test >= 0.0.8-1",
+      "santoku >= 0.0.191-1",
       "luacov >= 0.15.0-1",
-      "luassert >= 1.9.0-1",
     }
   },
 
