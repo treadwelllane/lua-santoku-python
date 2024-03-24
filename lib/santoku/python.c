@@ -780,7 +780,7 @@ int tk_python_tuple_index (lua_State *L)
 
 int tk_python_iter_call (lua_State *L)
 {
-  PyObject *iter = tk_python_peek_val(L, -1);
+  PyObject *iter = tk_python_peek_val(L, 1);
   PyObject *next = PyIter_Next(iter);
   if (next == NULL) {
     if (PyErr_Occurred())
@@ -1069,6 +1069,8 @@ int luaopen_santoku_python (lua_State *L)
   lua_pop(L, 1); // mt
 
   luaL_newmetatable(L, TK_PYTHON_MT_ITER); // mt mte
+  lua_pushcfunction(L, tk_python_generic_index);
+  lua_setfield(L, -2, "__index"); // mt mte
   lua_pushcfunction(L, tk_python_iter_call);
   lua_setfield(L, -2, "__call"); // mt mte
   lua_pop(L, 1); // mt
