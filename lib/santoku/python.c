@@ -10,6 +10,7 @@
 #define TK_PYTHON_MT_GENERIC "santoku_python_generic"
 #define TK_PYTHON_MT_ITER "santoku_python_iter"
 #define TK_PYTHON_MT_TUPLE "santoku_python_tuple"
+#define TK_PYTHON_MT_LIST "santoku_python_list"
 
 int TK_PYTHON_REF_IDX;
 int TK_PYTHON_EPHEMERON_IDX;
@@ -34,6 +35,14 @@ typedef struct {
   int maxn;
 } tk_python_LuaTableIter;
 
+typedef struct {
+  PyObject_HEAD
+  intptr_t Lp;
+  int ref;
+} tk_python_LuaFunction;
+
+void tk_python_push_val (lua_State *, PyObject *);
+void tk_python_generic_to_lua (lua_State *, int);
 int tk_python_builtin (lua_State *);
 int tk_python_error (lua_State *);
 void tk_lua_callmod (lua_State *, int, int, const char *, const char *);
@@ -241,6 +250,70 @@ PyObject *tk_python_LuaVector_sq_item (tk_python_LuaVector *a, Py_ssize_t n)
   return obj;
 }
 
+PyObject *tk_python_LuaFunction_call (
+  tk_python_LuaFunction *self,
+  PyObject *args, PyObject *kwargs)
+{
+  lua_State *L = (lua_State *) self->Lp;
+
+  int top = lua_gettop(L);
+
+  tk_python_deref(L, self->ref); // fn
+
+  int argn_lua = 0;
+
+  if (kwargs == NULL) {
+    lua_pushnil(L); // fn kwargs
+    argn_lua ++;
+  } else {
+    tk_python_push_val(L, kwargs); // fn kwargsval
+    tk_python_python_to_lua(L, -1, false, false); // fn kwargsval kwargs
+    lua_remove(L, -2); // fn kwargs
+    argn_lua ++;
+  }
+
+  Py_ssize_t argn_py = PyTuple_Size(args);
+
+  if (argn_py < 0) {
+    tk_python_error(L);
+    return NULL;
+  }
+
+  for (Py_ssize_t i = 0; i < argn_py; i ++) {
+    PyObject *item = PyTuple_GetItem(args, i);
+    tk_python_push_val(L, item); // fn kwargs argval..
+    tk_python_python_to_lua(L, -1, false, false); // fn kwargs argval arg..
+    lua_remove(L, -2); // fn kwargs arg..
+    argn_lua ++;
+  }
+
+  lua_call(L, argn_lua, LUA_MULTRET);
+
+  int nret = lua_gettop(L) - top;
+
+  if (nret == 0) {
+
+    return Py_None;
+
+  } else if (nret == 1) {
+
+    return tk_python_lua_to_python(L, top + 1, false, false);
+
+  } else {
+
+    PyObject *ret = PyTuple_New(nret);
+
+    for (int i = 1; i <= nret; i ++) {
+      PyObject *o = tk_python_lua_to_python(L, top + i, false, false);
+      PyTuple_SetItem(ret, i - 1, o);
+    }
+
+    return ret;
+
+  }
+
+}
+
 PySequenceMethods tk_python_LuaVector_as_sequence = {
   .sq_length = (lenfunc) tk_python_LuaVector_sq_length,
   .sq_item = (ssizeargfunc) tk_python_LuaVector_sq_item,
@@ -273,9 +346,19 @@ PyTypeObject tk_python_LuaTableIterType = {
   .tp_iternext = (iternextfunc) tk_python_LuaTableIter_next
 };
 
-// TODO: Duplicated across santoku-python and
-// santoku-web, should be split into separate
-// library
+PyTypeObject tk_python_LuaFunctionType = {
+  .ob_base = PyVarObject_HEAD_INIT(NULL, 0)
+  .tp_name = "santoku.LuaFunction",
+  .tp_doc = PyDoc_STR("Lua function wrappers"),
+  .tp_basicsize = sizeof(tk_python_LuaFunction),
+  .tp_itemsize = 0,
+  .tp_flags = Py_TPFLAGS_DEFAULT,
+  .tp_new = PyType_GenericNew,
+  .tp_init = (initproc) tk_python_LuaTable_init,
+  .tp_dealloc = (destructor) tk_python_LuaTable_dealloc,
+  .tp_call = (ternaryfunc) tk_python_LuaFunction_call,
+};
+
 void tk_lua_callmod (lua_State *L, int nargs, int nret, const char *smod, const char *sfn)
 {
   lua_getglobal(L, "require"); // arg req
@@ -372,8 +455,6 @@ void tk_python_deref (lua_State *L, int ref)
   lua_remove(L, -2); // val
 }
 
-void tk_python_push_val (lua_State *, PyObject *);
-
 void *PYTHON = NULL;
 
 int tk_python_close (lua_State *L)
@@ -439,6 +520,9 @@ int tk_python_open (lua_State *L)
   if (PyType_Ready(&tk_python_LuaVectorType) < 0)
     return tk_python_error(L);
 
+  if (PyType_Ready(&tk_python_LuaFunctionType) < 0)
+    return tk_python_error(L);
+
   lua_pushvalue(L, lua_upvalueindex(1)); // py
   return 1;
 }
@@ -493,6 +577,7 @@ PyObject *tk_python_peek_val_safe (lua_State *L, int i)
 {
   if (tk_python_check_metatable(L, i, TK_PYTHON_MT_GENERIC) ||
       tk_python_check_metatable(L, i, TK_PYTHON_MT_TUPLE) ||
+      tk_python_check_metatable(L, i, TK_PYTHON_MT_LIST) ||
       tk_python_check_metatable(L, i, TK_PYTHON_MT_ITER) ||
       tk_python_check_metatable(L, i, TK_PYTHON_MT_KWARGS)) {
     tk_python_get_ephemeron(L, i, 1);
@@ -584,6 +669,17 @@ int tk_python_bytes (lua_State *L)
   PyObject *bytes = PyBytes_FromStringAndSize(str, len);
   tk_python_push_val(L, bytes); // str bi
   tk_python_python_to_lua(L, -1, false, true);
+  return 1;
+}
+
+int tk_python_slice (lua_State *L)
+{
+  PyObject *obj = tk_python_peek_val_safe(L, 1);
+  Py_ssize_t start = luaL_checkinteger(L, 2);
+  Py_ssize_t end = luaL_checkinteger(L, 3);
+  PyObject *slice = PySequence_GetSlice(obj, start, end);
+  tk_python_push_val(L, slice);
+  tk_python_python_to_lua(L, -1, false, false);
   return 1;
 }
 
@@ -697,8 +793,11 @@ PyObject *tk_python_table_to_python (lua_State *L, int i, bool recurse)
 
 PyObject *tk_python_function_to_python (lua_State *L, int i)
 {
-  luaL_error(L, "function_to_python not implemented");
-  return NULL;
+  int ref = tk_python_ref(L, i);
+  PyObject *class = (PyObject *) &tk_python_LuaFunctionType;
+  PyObject *obj = PyObject_CallFunction(class, "L L", (intptr_t) L, ref);
+  if (!obj) { tk_python_error(L); return NULL; };
+  return obj;
 }
 
 PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse, bool force_wrap)
@@ -744,7 +843,7 @@ PyObject *tk_python_lua_to_python (lua_State *L, int i, bool recurse, bool force
 
 int tk_python_generic_index (lua_State *L)
 {
-  PyObject *obj = tk_python_peek_val(L, -2);
+  PyObject *obj = tk_python_lua_to_python(L, -2, false, false);
   PyObject *attr = tk_python_lua_to_python(L, -1, false, false);
 
   PyObject *mem = PyObject_GenericGetAttr(obj, attr);
@@ -764,8 +863,8 @@ int tk_python_tuple_index (lua_State *L)
     lua_Number i = lua_tointeger(L, -1);
 
     PyObject *mem = PyTuple_GetItem(tup, i);
-    Py_INCREF(mem);
     if (!mem) return tk_python_error(L);
+    Py_INCREF(mem);
 
     tk_python_push_val(L, mem);
     tk_python_python_to_lua(L, -1, false, false);
@@ -778,6 +877,28 @@ int tk_python_tuple_index (lua_State *L)
   }
 }
 
+int tk_python_list_index (lua_State *L)
+{
+  PyObject *list = tk_python_lua_to_python(L, -2, false, false);
+
+  if (lua_type(L, -1) == LUA_TNUMBER) {
+
+    lua_Number i = lua_tointeger(L, -1);
+
+    PyObject *mem = PyList_GetItem(list, i);
+    if (!mem) return tk_python_error(L);
+    Py_INCREF(mem);
+
+    tk_python_push_val(L, mem);
+    tk_python_python_to_lua(L, -1, false, false);
+    return 1;
+
+  } else {
+
+    return tk_python_generic_index(L);
+
+  }
+}
 int tk_python_iter_call (lua_State *L)
 {
   PyObject *iter = tk_python_peek_val(L, 1);
@@ -806,8 +927,8 @@ void tk_python_generic_to_lua (lua_State *L, int i)
   lua_newuserdata(L, 0); // val udata
   lua_insert(L, -2); // udata val
   tk_python_set_ephemeron(L, -2, 1); // udata
-  luaL_getmetatable(L, TK_PYTHON_MT_GENERIC);
-  lua_setmetatable(L, -2);
+  luaL_getmetatable(L, TK_PYTHON_MT_GENERIC); // udata mt
+  lua_setmetatable(L, -2); // udata
 }
 
 void tk_python_tuple_to_lua (lua_State *L, int i)
@@ -817,6 +938,16 @@ void tk_python_tuple_to_lua (lua_State *L, int i)
   lua_insert(L, -2); // udata val
   tk_python_set_ephemeron(L, -2, 1); // udata
   luaL_getmetatable(L, TK_PYTHON_MT_TUPLE);
+  lua_setmetatable(L, -2);
+}
+
+void tk_python_list_to_lua (lua_State *L, int i)
+{
+  lua_pushvalue(L, i); // val
+  lua_newuserdata(L, 0); // val udata
+  lua_insert(L, -2); // udata val
+  tk_python_set_ephemeron(L, -2, 1); // udata
+  luaL_getmetatable(L, TK_PYTHON_MT_LIST);
   lua_setmetatable(L, -2);
 }
 
@@ -867,6 +998,9 @@ void tk_python_python_to_lua (lua_State *L, int i, bool recurse, bool force_gene
 
   } else if (Py_IS_TYPE(obj, &PyTuple_Type)) {
     tk_python_tuple_to_lua(L, i);
+
+  } else if (Py_IS_TYPE(obj, &PyList_Type)) {
+    tk_python_list_to_lua(L, i);
 
   } else if (PyIter_Check(obj)) {
     tk_python_iter_to_lua(L, i);
@@ -1038,6 +1172,7 @@ int tk_python_val_call (lua_State *L)
 luaL_Reg tk_python_fns[] =
 {
   { "bytes", tk_python_bytes },
+  { "slice", tk_python_slice },
   { "collect", tk_python_collect },
   { "close", tk_python_close },
   { "builtin", tk_python_builtin },
@@ -1077,6 +1212,11 @@ int luaopen_santoku_python (lua_State *L)
 
   luaL_newmetatable(L, TK_PYTHON_MT_TUPLE); // mt mte
   lua_pushcfunction(L, tk_python_tuple_index);
+  lua_setfield(L, -2, "__index"); // mt mte
+  lua_pop(L, 1); // mt
+
+  luaL_newmetatable(L, TK_PYTHON_MT_LIST); // mt mte
+  lua_pushcfunction(L, tk_python_list_index);
   lua_setfield(L, -2, "__index"); // mt mte
   lua_pop(L, 1); // mt
 
