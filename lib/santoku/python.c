@@ -506,8 +506,12 @@ int tk_python_open (lua_State *L)
 
   PYTHON = dlopen(lib, RTLD_NOW | RTLD_GLOBAL);
 
-  if (PYTHON == NULL)
-    luaL_error(L, "Error loading python library");
+  if (PYTHON == NULL) {
+    lua_pushstring(L, "Error loading python library");
+    const char *e = dlerror();
+    lua_pushstring(L, e ? e : "unknown error");
+    tk_lua_callmod(L, 2, 0, "santoku.error", "error");
+  }
 
   Py_Initialize();
 
