@@ -1,9 +1,8 @@
 local test = require("santoku.test")
 local serialize = require("santoku.serialize") -- luacheck: ignore
 
-local iter = require("santoku.iter")
-local collect = iter.collect
-local map = iter.map
+local arr = require("santoku.array")
+local imap = arr.imap
 
 local err = require("santoku.error")
 local assert = err.assert
@@ -88,9 +87,9 @@ test("python", function ()
 
   test("sequence protocol", function ()
     assert(eq(3, py.builtin("len")({ 1, 2, 3 })))
-    assert(teq({ 1, 2, 3 }, collect(map(function (kv)
+    assert(teq({ 1, 2, 3 }, imap(function (kv)
       return kv[1]
-    end, py.builtin("enumerate")({ 1, 2, 3 })))))
+    end, py.builtin("enumerate")({ 1, 2, 3 }))))
   end)
 
   py.collect()
